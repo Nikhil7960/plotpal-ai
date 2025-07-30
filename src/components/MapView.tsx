@@ -14,9 +14,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Mock data for now - in real app this would come from AI analysis
 interface LocationResult {
   id: string;
+  title: string;
   address: string;
   coordinates: [number, number];
   score: number;
@@ -24,6 +24,9 @@ interface LocationResult {
   zoning: string;
   size: string;
   attributes: string[];
+  price: number;
+  plotType: string;
+  amenities: string[];
 }
 
 interface MapViewProps {
@@ -40,8 +43,13 @@ const MapView = ({ city, results }: MapViewProps) => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    // Get initial coordinates from first result or default to India center
+    const initialCoords = results.length > 0 
+      ? [results[0].coordinates[1], results[0].coordinates[0]] as [number, number]
+      : [20.5937, 78.9629] as [number, number]; // Center of India
+
     // Initialize Leaflet map with OpenStreetMap tiles
-    map.current = L.map(mapContainer.current).setView([40.7128, -74.006], 12);
+    map.current = L.map(mapContainer.current).setView(initialCoords, 12);
 
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -149,7 +157,8 @@ const MapView = ({ city, results }: MapViewProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="font-medium text-sm">{selectedLocation.address}</p>
+                <h4 className="font-semibold text-sm">{selectedLocation.title}</h4>
+                <p className="text-xs text-muted-foreground">{selectedLocation.address}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge className={`${getScoreColor(selectedLocation.score)} text-white`}>
                     <Star className="w-3 h-3 mr-1" />
@@ -160,25 +169,28 @@ const MapView = ({ city, results }: MapViewProps) => {
               
               <div className="space-y-2">
                 <p className="text-sm font-medium">AI Analysis:</p>
-                <p className="text-sm text-muted-foreground">{selectedLocation.justification}</p>
+                <p className="text-xs text-muted-foreground">{selectedLocation.justification}</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="font-medium">Zoning:</span> {selectedLocation.zoning}
+                  <span className="font-medium">Type:</span> {selectedLocation.plotType}
                 </div>
                 <div>
                   <span className="font-medium">Size:</span> {selectedLocation.size}
                 </div>
+                <div className="col-span-2">
+                  <span className="font-medium">Price:</span> ₹{(selectedLocation.price / 10000000).toFixed(1)}Cr
+                </div>
               </div>
               
-              {selectedLocation.attributes.length > 0 && (
+              {selectedLocation.amenities.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium mb-2">Key Features:</p>
+                  <p className="text-sm font-medium mb-2">Amenities:</p>
                   <div className="flex flex-wrap gap-1">
-                    {selectedLocation.attributes.map((attr, index) => (
+                    {selectedLocation.amenities.slice(0, 4).map((amenity, index) => (
                       <Badge key={index} variant="secondary" className="text-xs">
-                        {attr}
+                        {amenity}
                       </Badge>
                     ))}
                   </div>
@@ -224,13 +236,17 @@ const MapView = ({ city, results }: MapViewProps) => {
                   <div className="flex-1 space-y-2">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-semibold">{result.address}</h4>
+                        <h4 className="font-semibold">{result.title}</h4>
+                        <p className="text-sm text-muted-foreground">{result.address}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge className={`${getScoreColor(result.score)} text-white`}>
                             {result.score}/100
                           </Badge>
                           <span className="text-sm text-muted-foreground">
                             {getScoreText(result.score)} Match
+                          </span>
+                          <span className="text-sm font-medium text-primary">
+                            ₹{(result.price / 10000000).toFixed(1)}Cr
                           </span>
                         </div>
                       </div>
@@ -239,11 +255,11 @@ const MapView = ({ city, results }: MapViewProps) => {
                     <p className="text-sm text-muted-foreground">{result.justification}</p>
                     
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{result.zoning}</Badge>
+                      <Badge variant="outline">{result.plotType}</Badge>
                       <Badge variant="outline">{result.size}</Badge>
-                      {result.attributes.slice(0, 3).map((attr, i) => (
+                      {result.amenities.slice(0, 3).map((amenity, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
-                          {attr}
+                          {amenity}
                         </Badge>
                       ))}
                     </div>

@@ -14,7 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cities: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      plots: {
+        Row: {
+          address: string
+          amenities: string[] | null
+          area_sqft: number | null
+          availability_status: string | null
+          city_id: string
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          plot_type: string | null
+          price_per_sqft: number | null
+          suitable_for: string[] | null
+          title: string
+          total_price: number | null
+          updated_at: string
+          zoning: string | null
+        }
+        Insert: {
+          address: string
+          amenities?: string[] | null
+          area_sqft?: number | null
+          availability_status?: string | null
+          city_id: string
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          plot_type?: string | null
+          price_per_sqft?: number | null
+          suitable_for?: string[] | null
+          title: string
+          total_price?: number | null
+          updated_at?: string
+          zoning?: string | null
+        }
+        Update: {
+          address?: string
+          amenities?: string[] | null
+          area_sqft?: number | null
+          availability_status?: string | null
+          city_id?: string
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          plot_type?: string | null
+          price_per_sqft?: number | null
+          suitable_for?: string[] | null
+          title?: string
+          total_price?: number | null
+          updated_at?: string
+          zoning?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plots_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
