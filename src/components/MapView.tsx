@@ -1,10 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star, Navigation, X } from "lucide-react";
+
+// Fix for default marker icons in Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 // Mock data for now - in real app this would come from AI analysis
 interface LocationResult {
@@ -25,36 +33,23 @@ interface MapViewProps {
 
 const MapView = ({ city, results }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  const map = useRef<L.Map | null>(null);
+  const markers = useRef<L.Marker[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
-
-  // Mock Mapbox token placeholder - user will need to provide their own
-  const MAPBOX_TOKEN = 'pk.YOUR_MAPBOX_TOKEN_HERE';
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // For demo purposes, we'll show a message about Mapbox token
-    if (MAPBOX_TOKEN === 'pk.YOUR_MAPBOX_TOKEN_HERE') {
-      return;
-    }
+    // Initialize Leaflet map with OpenStreetMap tiles
+    map.current = L.map(mapContainer.current).setView([40.7128, -74.006], 12);
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/light-v11',
-      center: [-74.006, 40.7128], // Default to NYC
-      zoom: 12,
-    });
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map.current);
 
-    map.current.addControl(
-      new mapboxgl.NavigationControl({
-        visualizePitch: true,
-      }),
-      'top-right'
-    );
+    // Add zoom control
+    L.control.zoom({ position: 'topright' }).addTo(map.current);
 
     return () => {
       map.current?.remove();
@@ -70,33 +65,36 @@ const MapView = ({ city, results }: MapViewProps) => {
 
     // Add new markers
     results.forEach((result, index) => {
-      const el = document.createElement('div');
-      el.className = 'marker';
-      el.style.width = '32px';
-      el.style.height = '32px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = index === 0 ? '#3b82f6' : index === 1 ? '#8b5cf6' : '#10b981';
-      el.style.border = '3px solid white';
-      el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-      el.style.cursor = 'pointer';
-      el.style.display = 'flex';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
-      el.style.color = 'white';
-      el.style.fontWeight = 'bold';
-      el.style.fontSize = '14px';
-      el.innerHTML = (index + 1).toString();
+      // Create custom marker icon
+      const customIcon = L.divIcon({
+        html: `<div style="
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background-color: ${index === 0 ? '#3b82f6' : index === 1 ? '#8b5cf6' : '#10b981'};
+          border: 3px solid white;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+        ">${index + 1}</div>`,
+        className: 'custom-marker',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(result.coordinates)
-        .addTo(map.current!);
+      const marker = L.marker([result.coordinates[1], result.coordinates[0]], {
+        icon: customIcon
+      }).addTo(map.current!);
 
-      el.addEventListener('click', () => {
+      marker.on('click', () => {
         setSelectedLocation(result);
-        map.current?.flyTo({
-          center: result.coordinates,
-          zoom: 15,
-          duration: 1000
+        map.current?.setView([result.coordinates[1], result.coordinates[0]], 15, {
+          animate: true,
+          duration: 1
         });
       });
 
@@ -105,9 +103,8 @@ const MapView = ({ city, results }: MapViewProps) => {
 
     // Fit map to show all markers
     if (results.length > 0) {
-      const bounds = new mapboxgl.LngLatBounds();
-      results.forEach(result => bounds.extend(result.coordinates));
-      map.current.fitBounds(bounds, { padding: 50 });
+      const group = new L.FeatureGroup(markers.current);
+      map.current.fitBounds(group.getBounds(), { padding: [20, 20] });
     }
   }, [results]);
 
@@ -124,23 +121,6 @@ const MapView = ({ city, results }: MapViewProps) => {
     if (score >= 60) return "Good";
     return "Fair";
   };
-
-  if (MAPBOX_TOKEN === 'pk.YOUR_MAPBOX_TOKEN_HERE') {
-    return (
-      <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
-        <div className="text-center p-8">
-          <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Mapbox Token Required</h3>
-          <p className="text-muted-foreground mb-4">
-            To display the interactive map, please add your Mapbox public token.
-          </p>
-          <Button variant="outline" onClick={() => window.open('https://mapbox.com/', '_blank')}>
-            Get Mapbox Token
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
