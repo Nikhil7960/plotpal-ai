@@ -32,9 +32,10 @@ interface LocationResult {
 interface MapViewProps {
   city: string;
   results: LocationResult[];
+  cityCoordinates?: [number, number] | null;
 }
 
-const MapView = ({ city, results }: MapViewProps) => {
+const MapView = ({ city, results, cityCoordinates }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.Marker[]>([]);
@@ -43,10 +44,12 @@ const MapView = ({ city, results }: MapViewProps) => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Get initial coordinates from first result or default to India center
-    const initialCoords = results.length > 0 
-      ? [results[0].coordinates[1], results[0].coordinates[0]] as [number, number]
-      : [20.5937, 78.9629] as [number, number]; // Center of India
+    // Get initial coordinates from city coordinates, first result, or default to India center
+    const initialCoords = cityCoordinates 
+      ? [cityCoordinates[1], cityCoordinates[0]] as [number, number]
+      : results.length > 0 
+        ? [results[0].coordinates[1], results[0].coordinates[0]] as [number, number]
+        : [20.5937, 78.9629] as [number, number]; // Center of India
 
     // Initialize Leaflet map with OpenStreetMap tiles
     map.current = L.map(mapContainer.current).setView(initialCoords, 12);
@@ -62,16 +65,22 @@ const MapView = ({ city, results }: MapViewProps) => {
     return () => {
       map.current?.remove();
     };
-  }, []);
+  }, [cityCoordinates]);
 
   useEffect(() => {
-    if (!map.current || !results.length) return;
+    if (!map.current) return;
 
     // Clear existing markers
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
-    // Add new markers
+    // If no results but we have city coordinates, center map on city
+    if (results.length === 0 && cityCoordinates) {
+      map.current.setView([cityCoordinates[1], cityCoordinates[0]], 12);
+      return;
+    }
+
+    // Add new markers for results
     results.forEach((result, index) => {
       // Create custom marker icon
       const customIcon = L.divIcon({
@@ -114,7 +123,7 @@ const MapView = ({ city, results }: MapViewProps) => {
       const group = new L.FeatureGroup(markers.current);
       map.current.fitBounds(group.getBounds(), { padding: [20, 20] });
     }
-  }, [results]);
+  }, [results, cityCoordinates]);
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "bg-success";
@@ -207,7 +216,7 @@ const MapView = ({ city, results }: MapViewProps) => {
       </div>
 
       {/* Results List */}
-      {results.length > 0 && (
+      {results.length > 0 ? (
         <div className="grid gap-4">
           <h3 className="text-xl font-bold flex items-center gap-2">
             <Star className="w-5 h-5 text-primary" />
@@ -268,6 +277,16 @@ const MapView = ({ city, results }: MapViewProps) => {
               </CardContent>
             </Card>
           ))}
+        </div>
+      ) : (
+        <div className="text-center space-y-4">
+          <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" />
+            Viewing {city}
+          </h3>
+          <p className="text-muted-foreground">
+            Found 0 suitable plots for your criteria. The map shows the searched location.
+          </p>
         </div>
       )}
     </div>

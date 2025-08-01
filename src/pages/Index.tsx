@@ -27,6 +27,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<LocationResult[]>([]);
   const [currentCity, setCurrentCity] = useState('');
+  const [cityCoordinates, setCityCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
   const analyzeLocations = async (query: string, city: string, size: string) => {
@@ -119,6 +120,7 @@ const Index = () => {
       
       setSearchResults(formattedResults);
       setCurrentCity(cityData.name);
+      setCityCoordinates([cityData.longitude, cityData.latitude]);
       setCurrentView('results');
       
       toast({
@@ -206,6 +208,7 @@ const Index = () => {
             <MapView 
               city={currentCity}
               results={searchResults}
+              cityCoordinates={cityCoordinates}
             />
           </div>
         </div>
