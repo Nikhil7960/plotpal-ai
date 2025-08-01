@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
-import MapView from "@/components/MapView";
+import MapboxView from "@/components/MapboxView";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -205,7 +205,7 @@ const Index = () => {
           </header>
           
           <div className="flex-1 py-8 max-w-6xl mx-auto px-6">
-            <MapView 
+            <MapboxView 
               city={currentCity}
               results={searchResults}
               cityCoordinates={cityCoordinates}
