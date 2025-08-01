@@ -53,16 +53,18 @@ serve(async (req) => {
       )
     }
 
-    // If not in database, use OpenStreetMap Nominatim API for geocoding
-    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1&countrycodes=in`
+    // If not in database, use OpenWeatherMap Geocoding API
+    const openWeatherApiKey = Deno.env.get('OPENWEATHER_API_KEY')
     
-    console.log(`Geocoding via Nominatim: ${nominatimUrl}`)
+    if (!openWeatherApiKey) {
+      throw new Error('OpenWeatherMap API key not configured')
+    }
     
-    const geocodeResponse = await fetch(nominatimUrl, {
-      headers: {
-        'User-Agent': 'SiteSelection-App'
-      }
-    })
+    const geocodeUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)},IN&limit=1&appid=${openWeatherApiKey}`
+    
+    console.log(`Geocoding via OpenWeatherMap: ${geocodeUrl.replace(openWeatherApiKey, '***')}`)
+    
+    const geocodeResponse = await fetch(geocodeUrl)
 
     if (!geocodeResponse.ok) {
       throw new Error('Geocoding service unavailable')
@@ -82,14 +84,10 @@ serve(async (req) => {
 
     const result = geocodeData[0]
     
-    // Parse display name to extract state
-    const displayParts = result.display_name.split(', ')
-    const state = displayParts.length > 2 ? displayParts[displayParts.length - 3] : null
-
     const newCity = {
       name: result.name || city,
-      state: state,
-      country: 'India',
+      state: result.state || null,
+      country: result.country || 'India',
       latitude: parseFloat(result.lat),
       longitude: parseFloat(result.lon)
     }
