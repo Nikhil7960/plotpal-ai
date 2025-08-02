@@ -63,16 +63,30 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
   };
 
   const initializeMap = async () => {
-    if (!mapContainer.current || !googleApiKey) return;
+    if (!mapContainer.current || !googleApiKey) {
+      console.log("Missing requirements:", { mapContainer: !!mapContainer.current, googleApiKey: !!googleApiKey });
+      return;
+    }
 
     try {
+      console.log("Starting Google Maps initialization with API key:", googleApiKey);
+      
       const loader = new Loader({
         apiKey: googleApiKey,
         version: "weekly",
         libraries: ["places", "geometry"]
       });
 
+      console.log("Loading Google Maps API...");
       await loader.load();
+      console.log("Google Maps API loaded successfully");
+
+      // Check if google.maps is available
+      if (!window.google || !window.google.maps) {
+        throw new Error("Google Maps API not available after loading");
+      }
+
+      console.log("Google Maps object is available, creating map...");
 
       // Get initial coordinates
       const initialCoords = cityCoordinates 
@@ -80,6 +94,8 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
         : results.length > 0 
           ? { lat: results[0].coordinates[1], lng: results[0].coordinates[0] }
           : { lat: 20.5937, lng: 78.9629 }; // Center of India
+
+      console.log("Initial coordinates:", initialCoords);
 
       map.current = new google.maps.Map(mapContainer.current, {
         center: initialCoords,
@@ -101,11 +117,17 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
         ]
       });
 
+      console.log("Map created successfully:", map.current);
       setIsMapLoaded(true);
       toast.success("Map loaded successfully!");
     } catch (error) {
       console.error("Error loading Google Maps:", error);
-      toast.error(`Failed to load Google Maps: ${error.message}`);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      toast.error(`Failed to load Google Maps: ${error.message || 'Unknown error'}`);
     }
   };
 
