@@ -132,8 +132,16 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
   };
 
   useEffect(() => {
-    if (googleApiKey && !map.current) {
+    if (googleApiKey && !map.current && mapContainer.current) {
       initializeMap();
+    } else if (googleApiKey && !map.current && !mapContainer.current) {
+      // DOM element not ready yet, wait a bit
+      const timer = setTimeout(() => {
+        if (mapContainer.current) {
+          initializeMap();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [googleApiKey]);
 
