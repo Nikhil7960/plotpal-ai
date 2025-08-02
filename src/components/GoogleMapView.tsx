@@ -34,7 +34,7 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
   const map = useRef<google.maps.Map | null>(null);
   const markers = useRef<google.maps.Marker[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
-  const [googleApiKey, setGoogleApiKey] = useState('');
+  const [googleApiKey, setGoogleApiKey] = useState('AIzaSyC8I1N97IdW38H5bIEAzPA5b_c6N6Jc-i4');
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite');
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
