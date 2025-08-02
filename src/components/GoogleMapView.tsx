@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { Loader } from '@googlemaps/js-api-loader';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Star, Navigation, X, Map, Satellite, Building, Crosshair, Eye } from "lucide-react";
+import { MapPin, Star, Navigation, X, Map, Satellite, Crosshair } from "lucide-react";
 import { toast } from "sonner";
 
 interface LocationResult {
@@ -24,20 +23,20 @@ interface LocationResult {
   amenities: string[];
 }
 
-interface MapboxViewProps {
+interface GoogleMapViewProps {
   city: string;
   results: LocationResult[];
   cityCoordinates?: [number, number] | null;
 }
 
-const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
+const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  const map = useRef<google.maps.Map | null>(null);
+  const markers = useRef<google.maps.Marker[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
-  const [mapboxToken, setMapboxToken] = useState('');
-  const [isTokenSet, setIsTokenSet] = useState(false);
-  const [mapStyle, setMapStyle] = useState('satellite-streets');
+  const [googleApiKey, setGoogleApiKey] = useState('');
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite');
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 
   // Get user location
@@ -48,11 +47,8 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
           const coords: [number, number] = [position.coords.longitude, position.coords.latitude];
           setUserLocation(coords);
           if (map.current) {
-            map.current.flyTo({
-              center: coords,
-              zoom: 15,
-              duration: 2000
-            });
+            map.current.panTo({ lat: coords[1], lng: coords[0] });
+            map.current.setZoom(15);
           }
           toast.success("Location found!");
         },
@@ -66,119 +62,99 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
     }
   };
 
-  const initializeMap = () => {
-    if (!mapContainer.current || !mapboxToken) return;
+  const initializeMap = async () => {
+    if (!mapContainer.current || !googleApiKey) return;
 
-    mapboxgl.accessToken = mapboxToken;
-
-    // Get initial coordinates
-    const initialCoords = cityCoordinates 
-      ? [cityCoordinates[0], cityCoordinates[1]] as [number, number]
-      : results.length > 0 
-        ? [results[0].coordinates[0], results[0].coordinates[1]] as [number, number]
-        : [78.9629, 20.5937] as [number, number]; // Center of India
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: `mapbox://styles/mapbox/${mapStyle}-v12`,
-      center: initialCoords,
-      zoom: 12,
-      pitch: 45,
-      bearing: 0,
-      projection: 'globe' as any
-    });
-
-    // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl({
-      visualizePitch: true
-    }), 'top-right');
-
-    // Add geolocate control
-    const geolocate = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true
-      },
-      trackUserLocation: true,
-      showUserHeading: true
-    });
-    map.current.addControl(geolocate, 'top-right');
-
-    // Add fullscreen control
-    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
-
-    // Add atmosphere and fog effects for globe
-    map.current.on('style.load', () => {
-      map.current?.setFog({
-        'range': [1, 20],
-        'color': 'rgb(186, 210, 235)',
-        'high-color': 'rgb(36, 92, 223)',
-        'horizon-blend': 0.02
+    try {
+      const loader = new Loader({
+        apiKey: googleApiKey,
+        version: "weekly",
+        libraries: ["places", "geometry"]
       });
-    });
 
-    setIsTokenSet(true);
+      await loader.load();
+
+      // Get initial coordinates
+      const initialCoords = cityCoordinates 
+        ? { lat: cityCoordinates[1], lng: cityCoordinates[0] }
+        : results.length > 0 
+          ? { lat: results[0].coordinates[1], lng: results[0].coordinates[0] }
+          : { lat: 20.5937, lng: 78.9629 }; // Center of India
+
+      map.current = new google.maps.Map(mapContainer.current, {
+        center: initialCoords,
+        zoom: 12,
+        mapTypeId: mapType,
+        tilt: 45,
+        heading: 0,
+        mapTypeControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+        gestureHandling: 'greedy',
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }]
+          }
+        ]
+      });
+
+      setIsMapLoaded(true);
+      toast.success("Map loaded successfully!");
+    } catch (error) {
+      console.error("Error loading Google Maps:", error);
+      toast.error("Failed to load Google Maps");
+    }
   };
 
   useEffect(() => {
-    if (mapboxToken && !map.current) {
+    if (googleApiKey && !map.current) {
       initializeMap();
     }
-
-    return () => {
-      map.current?.remove();
-    };
-  }, [mapboxToken]);
+  }, [googleApiKey]);
 
   useEffect(() => {
-    if (!map.current || !isTokenSet) return;
+    if (!map.current || !isMapLoaded) return;
 
     // Clear existing markers
-    markers.current.forEach(marker => marker.remove());
+    markers.current.forEach(marker => marker.setMap(null));
     markers.current = [];
 
     // If no results but we have city coordinates, center map on city
     if (results.length === 0 && cityCoordinates) {
-      map.current.flyTo({
-        center: [cityCoordinates[0], cityCoordinates[1]],
-        zoom: 12,
-        duration: 1000
-      });
+      map.current.panTo({ lat: cityCoordinates[1], lng: cityCoordinates[0] });
+      map.current.setZoom(12);
       return;
     }
 
     // Add new markers for results
     results.forEach((result, index) => {
-      // Create custom marker element
-      const markerElement = document.createElement('div');
-      markerElement.style.cssText = `
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background-color: ${index === 0 ? '#3b82f6' : index === 1 ? '#8b5cf6' : '#10b981'};
-        border: 3px solid white;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 14px;
-        cursor: pointer;
-      `;
-      markerElement.textContent = (index + 1).toString();
+      const marker = new google.maps.Marker({
+        position: { lat: result.coordinates[1], lng: result.coordinates[0] },
+        map: map.current!,
+        title: result.title,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: index === 0 ? '#3b82f6' : index === 1 ? '#8b5cf6' : '#10b981',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+          scale: 16,
+        },
+        label: {
+          text: (index + 1).toString(),
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '14px'
+        }
+      });
 
-      const marker = new mapboxgl.Marker(markerElement)
-        .setLngLat([result.coordinates[0], result.coordinates[1]])
-        .addTo(map.current!);
-
-      markerElement.addEventListener('click', () => {
+      marker.addListener('click', () => {
         setSelectedLocation(result);
-        map.current?.flyTo({
-          center: [result.coordinates[0], result.coordinates[1]],
-          zoom: 16,
-          pitch: 60,
-          duration: 1500
-        });
+        map.current?.panTo({ lat: result.coordinates[1], lng: result.coordinates[0] });
+        map.current?.setZoom(16);
       });
 
       markers.current.push(marker);
@@ -186,18 +162,18 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
 
     // Fit map to show all markers
     if (results.length > 0) {
-      const bounds = new mapboxgl.LngLatBounds();
+      const bounds = new google.maps.LatLngBounds();
       results.forEach(result => {
-        bounds.extend([result.coordinates[0], result.coordinates[1]]);
+        bounds.extend({ lat: result.coordinates[1], lng: result.coordinates[0] });
       });
-      map.current.fitBounds(bounds, { padding: 50 });
+      map.current.fitBounds(bounds);
     }
-  }, [results, cityCoordinates, isTokenSet]);
+  }, [results, cityCoordinates, isMapLoaded]);
 
-  const changeMapStyle = (style: string) => {
+  const changeMapType = (type: 'roadmap' | 'satellite') => {
     if (map.current) {
-      setMapStyle(style);
-      map.current.setStyle(`mapbox://styles/mapbox/${style}-v12`);
+      setMapType(type);
+      map.current.setMapTypeId(type);
     }
   };
 
@@ -215,40 +191,40 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
     return "Fair";
   };
 
-  if (!isTokenSet) {
+  if (!isMapLoaded) {
     return (
       <div className="space-y-6">
         <Card className="max-w-md mx-auto">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Satellite className="w-5 h-5 text-primary" />
-              Mapbox Configuration Required
+              Google Maps Configuration Required
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="mapbox-token">Mapbox Public Token</Label>
+              <Label htmlFor="google-api-key">Google Maps API Key</Label>
               <Input
-                id="mapbox-token"
+                id="google-api-key"
                 type="password"
-                placeholder="pk.eyJ1IjoieW91cnVzZXJuYW1lIiwiYSI6..."
-                value={mapboxToken}
-                onChange={(e) => setMapboxToken(e.target.value)}
+                placeholder="AIzaSyB..."
+                value={googleApiKey}
+                onChange={(e) => setGoogleApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Get your free token from{' '}
+                Get your free API key from{' '}
                 <a 
-                  href="https://mapbox.com/" 
+                  href="https://developers.google.com/maps/documentation/javascript/get-api-key" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"
                 >
-                  mapbox.com
+                  Google Cloud Console
                 </a>
               </p>
             </div>
-            <Button onClick={initializeMap} disabled={!mapboxToken} className="w-full">
-              Initialize 3D Map
+            <Button onClick={initializeMap} disabled={!googleApiKey} className="w-full">
+              Initialize Google Maps
             </Button>
           </CardContent>
         </Card>
@@ -265,17 +241,17 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
         {/* Map Controls */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
           <Button
-            onClick={() => changeMapStyle('satellite-streets')}
-            variant={mapStyle === 'satellite-streets' ? 'default' : 'outline'}
+            onClick={() => changeMapType('satellite')}
+            variant={mapType === 'satellite' ? 'default' : 'outline'}
             size="sm"
             className="bg-background/90 backdrop-blur-sm"
           >
             <Satellite className="w-4 h-4 mr-1" />
-            3D
+            Satellite
           </Button>
           <Button
-            onClick={() => changeMapStyle('streets')}
-            variant={mapStyle === 'streets' ? 'default' : 'outline'}
+            onClick={() => changeMapType('roadmap')}
+            variant={mapType === 'roadmap' ? 'default' : 'outline'}
             size="sm"
             className="bg-background/90 backdrop-blur-sm"
           >
@@ -294,7 +270,7 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
 
         {/* Selected Location Details */}
         {selectedLocation && (
-          <Card className="absolute top-4 right-20 max-w-sm shadow-xl z-10 bg-background/95 backdrop-blur-sm">
+          <Card className="absolute top-4 right-4 max-w-sm shadow-xl z-10 bg-background/95 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -432,7 +408,7 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
             Viewing {city}
           </h3>
           <p className="text-muted-foreground">
-            Found 0 suitable plots for your criteria. The map shows the searched location in 3D satellite view.
+            Found 0 suitable plots for your criteria. The map shows the searched location with satellite and street view options.
           </p>
         </div>
       )}
@@ -440,4 +416,4 @@ const MapboxView = ({ city, results, cityCoordinates }: MapboxViewProps) => {
   );
 };
 
-export default MapboxView;
+export default GoogleMapView;
