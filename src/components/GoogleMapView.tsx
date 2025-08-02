@@ -105,7 +105,7 @@ const GoogleMapView = ({ city, results, cityCoordinates }: GoogleMapViewProps) =
       toast.success("Map loaded successfully!");
     } catch (error) {
       console.error("Error loading Google Maps:", error);
-      toast.error("Failed to load Google Maps");
+      toast.error(`Failed to load Google Maps: ${error.message}`);
     }
   };
 
