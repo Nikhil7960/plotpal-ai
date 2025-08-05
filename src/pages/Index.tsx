@@ -141,7 +141,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
+    <div className="min-h-screen bg-gradient-surface">
       {currentView === 'hero' && (
         <Hero onGetStarted={() => setCurrentView('search')} />
       )}
@@ -149,19 +149,22 @@ const Index = () => {
       {currentView === 'search' && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-            <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          <header className="border-b border-border/30 glass sticky top-0 z-50">
+            <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon"
                   onClick={() => setCurrentView('hero')}
+                  className="hover:scale-110 transition-transform duration-200"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  SiteSelect AI
+                <h1 className="text-2xl font-bold flex items-center gap-3">
+                  <div className="p-1.5 bg-gradient-to-br from-primary to-primary-glow rounded-lg">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-gradient">SiteSelect AI</span>
                 </h1>
               </div>
             </div>
@@ -179,25 +182,29 @@ const Index = () => {
       {currentView === 'results' && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-            <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          <header className="border-b border-border/30 glass sticky top-0 z-50">
+            <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon"
                   onClick={() => setCurrentView('search')}
+                  className="hover:scale-110 transition-transform duration-200"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  SiteSelect AI
+                <h1 className="text-2xl font-bold flex items-center gap-3">
+                  <div className="p-1.5 bg-gradient-to-br from-primary to-primary-glow rounded-lg">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-gradient">SiteSelect AI</span>
                 </h1>
               </div>
               
               <Button 
                 variant="outline"
                 onClick={() => setCurrentView('search')}
+                className="hover:scale-105 transition-transform duration-200 font-semibold"
               >
                 New Search
               </Button>

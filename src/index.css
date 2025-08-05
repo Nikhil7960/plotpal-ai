@@ -43,20 +43,28 @@ All colors MUST be HSL.
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    /* Gradients */
+    /* Modern Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(280 100% 70%));
+    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(280 100% 75%));
     --gradient-hero: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(220 20% 98%));
+    --gradient-glass: linear-gradient(135deg, hsl(var(--background) / 0.7), hsl(var(--background) / 0.3));
+    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--card) / 0.8));
+    --gradient-surface: linear-gradient(180deg, hsl(var(--background)), hsl(220 25% 97%));
+    --gradient-mesh: conic-gradient(from 230.29deg at 51.63% 52.16%, hsl(var(--primary) / 0.1) 0deg, hsl(var(--accent) / 0.05) 67.5deg, hsl(var(--primary-glow) / 0.1) 198.75deg, hsl(var(--primary) / 0.1) 251.25deg, hsl(var(--primary) / 0.05) 301.88deg, hsl(var(--accent) / 0.1) 360deg);
 
-    /* Shadows */
-    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.2);
-    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.3);
-    --shadow-card: 0 4px 20px -4px hsl(220 10% 10% / 0.1);
+    /* Elegant Shadows */
+    --shadow-sm: 0 2px 8px -2px hsl(var(--foreground) / 0.04);
+    --shadow-md: 0 8px 25px -5px hsl(var(--foreground) / 0.1);
+    --shadow-lg: 0 20px 40px -12px hsl(var(--foreground) / 0.15);
+    --shadow-xl: 0 32px 64px -20px hsl(var(--foreground) / 0.2);
+    --shadow-glow: 0 0 60px hsl(var(--primary) / 0.4);
+    --shadow-accent: 0 8px 32px hsl(var(--accent) / 0.15);
+    --shadow-inner: inset 0 2px 4px 0 hsl(var(--foreground) / 0.04);
 
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    /* Smooth Animations */
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-elastic: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
@@ -123,5 +131,70 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv01", "cv03", "cv04", "cv11";
+  }
+
+  /* Glass morphism utilities */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background: var(--gradient-glass);
+    border: 1px solid hsl(var(--border) / 0.2);
+  }
+
+  .glass-card {
+    backdrop-filter: blur(20px) saturate(180%);
+    background: var(--gradient-card);
+    border: 1px solid hsl(var(--border) / 0.1);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Modern button effects */
+  .btn-glow {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+    transition: var(--transition-smooth);
+  }
+
+  .btn-glow:hover {
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.5);
+    transform: translateY(-1px);
+  }
+
+  /* Gradient mesh background */
+  .mesh-gradient {
+    background: var(--gradient-mesh);
+  }
+
+  /* Text gradients */
+  .text-gradient {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Floating animation */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Scale up animation */
+  @keyframes scale-up {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0px);
+    }
+  }
+
+  .animate-scale-up {
+    animation: scale-up 0.6s ease-out;
   }
 }
