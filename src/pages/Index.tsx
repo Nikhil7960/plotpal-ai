@@ -1,41 +1,25 @@
 import { useState } from "react";
 import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
-import GoogleMapView from "@/components/GoogleMapView";
 import ThemeToggle from "@/components/ThemeToggle";
+import GoogleMap from "@/components/GoogleMap";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-interface LocationResult {
-  id: string;
-  title: string;
-  address: string;
-  coordinates: [number, number];
-  score: number;
-  justification: string;
-  zoning: string;
-  size: string;
-  attributes: string[];
-  price: number;
-  plotType: string;
-  amenities: string[];
-}
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'hero' | 'search' | 'results'>('hero');
   const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<LocationResult[]>([]);
   const [currentCity, setCurrentCity] = useState('');
   const [cityCoordinates, setCityCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
-  const analyzeLocations = async (query: string, city: string, size: string) => {
+  const showCityMap = async (city: string) => {
     setIsLoading(true);
     
     try {
-      // First, geocode the city to get coordinates
+      // Geocode the city to get coordinates
       const geocodeResponse = await supabase.functions.invoke('geocode-city', {
         body: { city }
       });
@@ -46,94 +30,20 @@ const Index = () => {
 
       const { city: cityData } = geocodeResponse.data;
       
-      // Fetch plots for the city
-      const { data: plots, error: plotsError } = await supabase
-        .from('plots')
-        .select(`
-          *,
-          cities (
-            name,
-            state,
-            latitude,
-            longitude
-          )
-        `)
-        .eq('city_id', cityData.id);
-
-      if (plotsError) {
-        console.error('Error fetching plots:', plotsError);
-        throw new Error('Failed to fetch plots');
-      }
-
-      // Calculate scores and format results
-      const formattedResults: LocationResult[] = (plots || []).map((plot, index) => {
-        // Simple scoring algorithm based on plot attributes
-        let score = 70;
-        
-        // Boost score for commercial plots if query suggests business
-        if (plot.plot_type === 'commercial' && 
-            (query.toLowerCase().includes('business') || 
-             query.toLowerCase().includes('shop') || 
-             query.toLowerCase().includes('office'))) {
-          score += 15;
-        }
-        
-        // Boost score for residential plots if query suggests housing
-        if (plot.plot_type === 'residential' && 
-            (query.toLowerCase().includes('house') || 
-             query.toLowerCase().includes('home') || 
-             query.toLowerCase().includes('apartment'))) {
-          score += 15;
-        }
-        
-        // Add points for amenities
-        score += Math.min(plot.amenities?.length * 3, 15);
-        
-        // Reduce score based on position (first plots get higher scores)
-        score = Math.max(score - index * 5, 60);
-
-        const formatPrice = (price: number) => {
-          if (price >= 10000000) return `₹${(price / 10000000).toFixed(1)}Cr`;
-          if (price >= 100000) return `₹${(price / 100000).toFixed(1)}L`;
-          return `₹${price.toLocaleString()}`;
-        };
-
-        return {
-          id: plot.id,
-          title: plot.title,
-          address: plot.address,
-          coordinates: [plot.longitude, plot.latitude] as [number, number],
-          score: Math.min(score, 100),
-          justification: `${plot.plot_type === 'commercial' ? 'Prime commercial location' : 
-                          plot.plot_type === 'residential' ? 'Excellent residential area' : 
-                          'Strategic location'} in ${cityData.name}. ${plot.area_sqft} sq ft ${plot.plot_type} plot with ${plot.amenities?.length || 0} key amenities. ${plot.availability_status === 'available' ? 'Currently available for development.' : 'Limited availability.'}`,
-          zoning: plot.zoning || plot.plot_type,
-          size: `${plot.area_sqft?.toLocaleString()} sq ft`,
-          attributes: [...(plot.amenities || []), ...(plot.suitable_for || [])],
-          price: plot.total_price || 0,
-          plotType: plot.plot_type,
-          amenities: plot.amenities || []
-        };
-      });
-
-      // Sort by score
-      formattedResults.sort((a, b) => b.score - a.score);
-      
-      setSearchResults(formattedResults);
       setCurrentCity(cityData.name);
       setCityCoordinates([cityData.longitude, cityData.latitude]);
       setCurrentView('results');
       
       toast({
-        title: "Analysis Complete!",
-        description: `Found ${formattedResults.length} suitable plots in ${cityData.name}`,
+        title: "City Found! 🗺️",
+        description: `Showing map for ${cityData.name}`,
       });
       
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error('Location error:', error);
       toast({
-        title: "Analysis Failed",
-        description: "Sorry, we couldn't analyze locations right now. Please try again.",
+        title: "Location Failed",
+        description: "Sorry, we couldn't find this city. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -141,9 +51,26 @@ const Index = () => {
     }
   };
 
+  const handleSubmit = (city: string) => {
+    showCityMap(city);
+  };
+
+  const handleNewSearch = () => {
+    setCurrentView('search');
+    setCurrentCity('');
+    setCityCoordinates(null);
+  };
+
+  const handleBackToHome = () => {
+    setCurrentView('hero');
+    setCurrentCity('');
+    setCityCoordinates(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-surface">
       <ThemeToggle />
+      
       {currentView === 'hero' && (
         <Hero onGetStarted={() => setCurrentView('search')} />
       )}
@@ -157,7 +84,7 @@ const Index = () => {
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  onClick={() => setCurrentView('hero')}
+                  onClick={handleBackToHome}
                   className="hover:scale-110 transition-transform duration-200"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -174,14 +101,14 @@ const Index = () => {
           
           <div className="flex-1 py-8">
             <QueryInput 
-              onSearch={analyzeLocations}
+              onSearch={handleSubmit}
               isLoading={isLoading}
             />
           </div>
         </div>
       )}
       
-      {currentView === 'results' && (
+      {currentView === 'results' && cityCoordinates && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="border-b border-border/30 glass sticky top-0 z-50">
@@ -192,6 +119,7 @@ const Index = () => {
                   size="icon"
                   onClick={() => setCurrentView('search')}
                   className="hover:scale-110 transition-transform duration-200"
+                  title="Back to Search"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
@@ -203,22 +131,65 @@ const Index = () => {
                 </h1>
               </div>
               
-              <Button 
-                variant="outline"
-                onClick={() => setCurrentView('search')}
-                className="hover:scale-105 transition-transform duration-200 font-semibold"
-              >
-                New Search
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline"
+                  onClick={handleNewSearch}
+                  className="hover:scale-105 transition-transform duration-200 font-semibold"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  New Search
+                </Button>
+              </div>
             </div>
           </header>
           
-          <div className="flex-1 py-8 max-w-6xl mx-auto px-6">
-            <GoogleMapView 
-              city={currentCity}
-              results={searchResults}
-              cityCoordinates={cityCoordinates}
-            />
+          {/* Map Content */}
+          <div className="flex-1 p-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="mb-6">
+                <h2 className="text-3xl font-bold text-gradient mb-2">
+                  {currentCity}
+                </h2>
+                <p className="text-muted-foreground text-lg">
+                  Explore {currentCity} in 2D and 3D with satellite imagery and street views
+                </p>
+              </div>
+              
+              <GoogleMap 
+                city={currentCity}
+                coordinates={cityCoordinates}
+                className="animate-scale-up"
+              />
+              
+              {/* Additional Info Section */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="glass-card p-6 text-center">
+                  <h3 className="font-semibold text-lg mb-2">Coordinates</h3>
+                  <p className="text-muted-foreground">
+                    {cityCoordinates[1].toFixed(4)}°, {cityCoordinates[0].toFixed(4)}°
+                  </p>
+                </div>
+                <div className="glass-card p-6 text-center">
+                  <h3 className="font-semibold text-lg mb-2">View Modes</h3>
+                  <p className="text-muted-foreground">
+                    2D/3D, Satellite, Hybrid, Street
+                  </p>
+                </div>
+                <div className="glass-card p-6 text-center">
+                  <h3 className="font-semibold text-lg mb-2">3D Features</h3>
+                  <p className="text-muted-foreground">
+                    Buildings, Terrain, 45° Tilt
+                  </p>
+                </div>
+                <div className="glass-card p-6 text-center">
+                  <h3 className="font-semibold text-lg mb-2">Controls</h3>
+                  <p className="text-muted-foreground">
+                    Zoom, Rotate, Street View
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

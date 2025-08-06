@@ -1,0 +1,1 @@
+3. then pass this map image into gemini along user's query (Project Description & Land Size Preference) to find suitable places in that city
