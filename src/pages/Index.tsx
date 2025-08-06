@@ -2,6 +2,7 @@ import { useState } from "react";
 import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
 import GoogleMapView from "@/components/GoogleMapView";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -142,6 +143,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-surface">
+      <ThemeToggle />
       {currentView === 'hero' && (
         <Hero onGetStarted={() => setCurrentView('search')} />
       )}
