@@ -3,20 +3,22 @@ import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
 import ThemeToggle from "@/components/ThemeToggle";
 import GoogleMap from "@/components/GoogleMap";
+import VacantSpaceDetector from "@/components/VacantSpaceDetector";
 import MapSkeleton from "@/components/MapSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MapPin, RotateCcw, Navigation, Maximize2, Layers, Move3d } from "lucide-react";
+import { ArrowLeft, MapPin, RotateCcw, Navigation, Maximize2, Layers, Move3d, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'hero' | 'search' | 'results'>('hero');
+  const [currentView, setCurrentView] = useState<'hero' | 'search' | 'results' | 'analysis'>('hero');
   const [isLoading, setIsLoading] = useState(false);
   const [currentCity, setCurrentCity] = useState('');
+  const [buildingType, setBuildingType] = useState('');
   const [cityCoordinates, setCityCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
-  const showCityMap = async (city: string) => {
+  const showCityMap = async (city: string, selectedBuildingType?: string) => {
     setIsLoading(true);
     
     try {
@@ -42,39 +44,55 @@ const Index = () => {
       
       setCurrentCity(cityName);
       setCityCoordinates([lng, lat]);
-      setCurrentView('results');
+      setBuildingType(selectedBuildingType || '');
       
-      toast({
-        title: "City Found! 🗺️",
-        description: `Showing map for ${cityName}`,
-      });
-      
-    } catch (error) {
-      console.error('Location error:', error);
-      toast({
-        title: "Location Failed",
-        description: "Sorry, we couldn't find this city. Please try again.",
-        variant: "destructive",
-      });
+      // If building type is selected, go to analysis view, otherwise regular map view
+      if (selectedBuildingType) {
+        setCurrentView('analysis');
+        toast({
+          title: "AI Analysis Ready! 🤖",
+          description: `Map loaded for ${cityName}. Ready to analyze vacant spaces for ${selectedBuildingType}.`,
+        });
+      } else {
+        setCurrentView('results');
+        toast({
+          title: "City Found! 🗺️",
+          description: `Showing map for ${cityName}`,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = (city: string) => {
-    showCityMap(city);
+  const handleSubmit = (city: string, selectedBuildingType?: string) => {
+    showCityMap(city, selectedBuildingType);
   };
 
   const handleNewSearch = () => {
     setCurrentView('search');
     setCurrentCity('');
+    setBuildingType('');
     setCityCoordinates(null);
   };
 
   const handleBackToHome = () => {
     setCurrentView('hero');
     setCurrentCity('');
+    setBuildingType('');
     setCityCoordinates(null);
+  };
+
+  const switchToAnalysis = () => {
+    if (cityCoordinates) {
+      setCurrentView('analysis');
+    }
+  };
+
+  const switchToMap = () => {
+    if (cityCoordinates) {
+      setCurrentView('results');
+    }
   };
 
   return (
@@ -140,13 +158,24 @@ const Index = () => {
                 </div>
               </div>
               
-              <Button 
-                variant="outline"
-                onClick={handleNewSearch}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                New Search
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={switchToAnalysis}
+                  className="hidden sm:flex"
+                >
+                  <Brain className="h-4 w-4 mr-2" />
+                  AI Analysis
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleNewSearch}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  New Search
+                </Button>
+              </div>
             </div>
           </header>
           
@@ -238,6 +267,60 @@ const Index = () => {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Analysis View */}
+      {currentView === 'analysis' && cityCoordinates && (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setCurrentView('search')}
+                  aria-label="Back to search"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Brain className="h-4 w-4 text-primary" />
+                  </div>
+                  <h1 className="text-xl font-semibold">AI Vacant Space Analysis</h1>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={switchToMap}
+                  className="hidden sm:flex"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Map View
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleNewSearch}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  New Search
+                </Button>
+              </div>
+            </div>
+          </header>
+          
+          {/* Analysis Content */}
+          <div className="flex-1 p-6">
+            <VacantSpaceDetector 
+              initialLocation={currentCity}
+              initialCoordinates={cityCoordinates}
+            />
           </div>
         </div>
       )}

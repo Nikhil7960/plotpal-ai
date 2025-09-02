@@ -3,20 +3,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, MapPin, Loader2, Globe } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, MapPin, Loader2, Globe, Building2, Coffee, ShoppingBag, Trees, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building } from "lucide-react";
 
 interface QueryInputProps {
-  onSearch: (city: string) => void;
+  onSearch: (city: string, buildingType?: string) => void;
   isLoading: boolean;
 }
 
+const BUILDING_TYPES = [
+  { value: 'cafe', label: 'Cafe', icon: Coffee },
+  { value: 'mall', label: 'Shopping Mall', icon: ShoppingBag },
+  { value: 'park', label: 'Park', icon: Trees },
+  { value: 'residential', label: 'Residential Complex', icon: Home },
+  { value: 'office', label: 'Office Building', icon: Building2 },
+  { value: 'hospital', label: 'Hospital', icon: Hospital },
+  { value: 'school', label: 'School', icon: GraduationCap },
+  { value: 'gym', label: 'Gym/Fitness Center', icon: Dumbbell },
+  { value: 'restaurant', label: 'Restaurant', icon: Utensils },
+  { value: 'hotel', label: 'Hotel', icon: Building },
+  { value: 'retail', label: 'Retail Store', icon: ShoppingBag },
+];
+
 const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
   const [city, setCity] = useState("");
+  const [buildingType, setBuildingType] = useState("");
+  const [analysisMode, setAnalysisMode] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (city.trim()) {
-      onSearch(city.trim());
+      onSearch(city.trim(), buildingType || undefined);
     }
   };
 
@@ -30,10 +47,10 @@ const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
             <Globe className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold">
-            View City Map
+            Explore Cities & Find Development Sites
           </CardTitle>
           <CardDescription className="text-base">
-            Enter any city name to explore it with an interactive map featuring satellite imagery and street views
+            Enter a city name to explore with interactive maps. Optionally select a building type to analyze vacant spaces with AI.
           </CardDescription>
         </CardHeader>
         
@@ -60,6 +77,56 @@ const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
               </p>
             </div>
 
+            {/* Analysis Mode Toggle */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="analysis-mode"
+                  checked={analysisMode}
+                  onChange={(e) => {
+                    setAnalysisMode(e.target.checked);
+                    if (!e.target.checked) {
+                      setBuildingType("");
+                    }
+                  }}
+                  className="w-4 h-4 text-primary"
+                />
+                <Label htmlFor="analysis-mode" className="text-sm font-medium cursor-pointer">
+                  Enable AI Vacant Space Analysis
+                </Label>
+              </div>
+              
+              {analysisMode && (
+                <div className="space-y-2">
+                  <Label htmlFor="building-type" className="text-sm font-medium">
+                    What do you want to build? (Optional)
+                  </Label>
+                  <Select value={buildingType} onValueChange={setBuildingType}>
+                    <SelectTrigger id="building-type">
+                      <SelectValue placeholder="Select building type for AI analysis" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BUILDING_TYPES.map((type) => {
+                        const Icon = type.icon;
+                        return (
+                          <SelectItem key={type.value} value={type.value}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4" />
+                              {type.label}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select this to analyze the map for suitable vacant spaces using AI
+                  </p>
+                </div>
+              )}
+            </div>
+
             <Button 
               type="submit" 
               size="lg" 
@@ -74,7 +141,7 @@ const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
               ) : (
                 <>
                   <Search className="w-5 h-5 mr-2" />
-                  View City Map
+                  {analysisMode && buildingType ? 'Analyze Vacant Spaces' : 'View City Map'}
                 </>
               )}
             </Button>
@@ -91,7 +158,7 @@ const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
                   size="sm"
                   onClick={() => {
                     setCity(exampleCity);
-                    onSearch(exampleCity);
+                    onSearch(exampleCity, buildingType || undefined);
                   }}
                   disabled={isLoading}
                   className="text-xs"

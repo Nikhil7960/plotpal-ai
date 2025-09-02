@@ -1,8 +1,83 @@
-# Welcome to your Lovable project
+# PlotPal AI - AI-Powered Vacant Space Detection
 
-## Project info
+An intelligent web application that uses Google Maps and Gemini AI to identify optimal vacant spaces for development projects.
+
+## Features
+
+- 🗺️ **Interactive Maps**: Explore cities with Google Maps satellite imagery
+- 🤖 **AI Analysis**: Use Gemini AI to analyze map screenshots for vacant spaces
+- 🏗️ **Building Type Selection**: Choose from cafes, malls, parks, residential, and more
+- 📍 **Smart Recommendations**: Get suitability scores and detailed reasoning
+- 🎯 **Location Insights**: Understand why a location is suitable for your project
+
+## How It Works
+
+1. **Enter Location**: Type in any city or address
+2. **Select Building Type**: Choose what you want to build (optional for AI analysis)
+3. **View Map**: Explore the area with satellite imagery
+4. **AI Analysis**: Capture map screenshot and analyze with Gemini AI
+5. **Get Recommendations**: View AI-identified vacant spaces with suitability scores
+
+## Project Info
 
 **URL**: https://lovable.dev/projects/9df934f7-1e01-4713-b0c0-7af8ff34146a
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js & npm - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Google Maps API Key
+- Gemini AI API Key
+
+### Installation
+
+```sh
+# Step 1: Clone the repository
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory
+cd plotpal-ai
+
+# Step 3: Install dependencies
+npm install
+
+# Step 4: Set up environment variables
+cp .env.example .env
+# Edit .env file with your API keys
+
+# Step 5: Start the development server
+npm run dev
+```
+
+### Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# Google Maps API Key (required for maps functionality)
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Gemini AI API Key (required for vacant space analysis)
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+#### Getting API Keys
+
+1. **Google Maps API Key**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable the following APIs:
+     - Maps JavaScript API
+     - Geocoding API
+   - Create credentials (API Key)
+   - Restrict the key to your domain for security
+
+2. **Gemini AI API Key**:
+   - Visit [Google AI Studio](https://aistudio.google.com/)
+   - Sign in with your Google account
+   - Create a new API key
+   - Copy the key to your .env file
 
 ## How can I edit this code?
 
@@ -18,24 +93,6 @@ Changes made via Lovable will be committed automatically to this repo.
 
 If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
@@ -50,15 +107,45 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
+## Technologies Used
 
 This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Frontend**: Vite + React + TypeScript
+- **UI Components**: shadcn/ui + Tailwind CSS
+- **Maps**: Google Maps JavaScript API
+- **AI**: Google Gemini AI
+- **Image Capture**: html2canvas
+- **State Management**: React hooks
+
+## Features in Detail
+
+### Map Functionality
+- Interactive Google Maps with satellite imagery
+- Location search and geocoding
+- Multiple map types (satellite, hybrid, street)
+- Zoom and pan controls
+- Street view integration
+
+### AI Analysis
+- Screenshot capture of map views
+- Gemini AI image analysis
+- Building-type specific recommendations
+- Suitability scoring (0-100%)
+- Detailed reasoning for each recommendation
+
+### Supported Building Types
+- Cafes & Coffee shops
+- Shopping Malls
+- Parks & Recreation areas
+- Residential Complexes
+- Office Buildings
+- Hospitals & Medical facilities
+- Schools & Educational institutions
+- Gyms & Fitness centers
+- Restaurants
+- Hotels
+- Retail stores
 
 ## How can I deploy this project?
 
