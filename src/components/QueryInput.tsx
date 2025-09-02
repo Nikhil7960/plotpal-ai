@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, MapPin, Building2, Loader2 } from "lucide-react";
+import { Search, MapPin, Loader2, Globe } from "lucide-react";
 
 interface QueryInputProps {
   onSearch: (city: string) => void;
@@ -21,60 +20,87 @@ const QueryInput = ({ onSearch, isLoading }: QueryInputProps) => {
     }
   };
 
+  const exampleCities = ["New York", "London", "Tokyo", "Paris"];
+
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12">
-      <Card className="glass-card border-0 animate-scale-up">
-        <CardHeader className="text-center pb-8">
-          <CardTitle className="text-3xl font-bold flex items-center justify-center gap-3 mb-4">
-            <div className="p-2 bg-gradient-to-br from-primary to-primary-glow rounded-xl">
-              <MapPin className="w-8 h-8 text-white" />
-            </div>
-            <span className="text-gradient">View City Map</span>
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <Card>
+        <CardHeader className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+            <Globe className="w-6 h-6 text-primary" />
+          </div>
+          <CardTitle className="text-3xl font-bold">
+            View City Map
           </CardTitle>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Enter any city name to view its location on an interactive map with satellite imagery.
-          </p>
+          <CardDescription className="text-base">
+            Enter any city name to explore it with an interactive map featuring satellite imagery and street views
+          </CardDescription>
         </CardHeader>
         
-        <CardContent className="space-y-8 p-8">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="space-y-3">
-              <Label htmlFor="city" className="text-base font-semibold flex items-center gap-3 text-foreground">
-                <div className="p-1.5 bg-accent/10 rounded-lg">
-                  <MapPin className="w-5 h-5 text-accent" />
-                </div>
-                Enter City Name
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="city" className="text-base font-medium">
+                City Name
               </Label>
-              <Input
-                id="city"
-                placeholder="e.g., New York, London, Tokyo, Mumbai..."
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="h-14 text-lg border-2 focus:border-accent transition-colors duration-300"
-                required
-              />
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="city"
+                  placeholder="Enter a city name..."
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="pl-10 h-12 text-base"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Try searching for: {exampleCities.join(", ")}
+              </p>
             </div>
 
             <Button 
               type="submit" 
-              variant="gradient" 
               size="lg" 
-              className="w-full h-16 text-lg font-bold tracking-wide btn-glow group"
+              className="w-full h-12 text-base font-medium"
               disabled={!city.trim() || isLoading}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   Loading Map...
                 </>
               ) : (
                 <>
-                  <Search className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
+                  <Search className="w-5 h-5 mr-2" />
                   View City Map
                 </>
               )}
             </Button>
           </form>
+
+          {/* Quick access buttons */}
+          <div className="mt-6 pt-6 border-t">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Popular cities:</p>
+            <div className="flex flex-wrap gap-2">
+              {exampleCities.map((exampleCity) => (
+                <Button
+                  key={exampleCity}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCity(exampleCity);
+                    onSearch(exampleCity);
+                  }}
+                  disabled={isLoading}
+                  className="text-xs"
+                >
+                  {exampleCity}
+                </Button>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

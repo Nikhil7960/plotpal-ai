@@ -1,5 +1,7 @@
-import { MapPin, Brain, Zap } from "lucide-react";
+import { MapPin, Brain, Zap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface HeroProps {
   onGetStarted: () => void;
@@ -7,79 +9,95 @@ interface HeroProps {
 
 const Hero = ({ onGetStarted }: HeroProps) => {
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden mesh-gradient">
-      {/* Dynamic background layers */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary-glow/3 to-transparent" />
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-background to-secondary/20">
+      {/* Subtle gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
       
-      {/* Floating animated orbs */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-primary/20 to-primary-glow/30 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-gradient-to-r from-accent/15 to-accent/25 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-gradient-to-r from-primary-glow/20 to-primary/15 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-      </div>
+      {/* Pattern overlay for visual interest */}
+      <div className="absolute inset-0 bg-grid-black/[0.02] dark:bg-grid-white/[0.02]" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center animate-scale-up">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
         {/* Header */}
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-3 px-6 py-3 glass rounded-full mb-8 hover:scale-105 transition-all duration-300">
-            <Brain className="w-5 h-5 text-primary" />
-            <span className="text-sm font-semibold text-primary tracking-wide">AI-Powered Location Intelligence</span>
-          </div>
+        <div className="mb-12 space-y-6">
+          <Badge variant="secondary" className="px-4 py-1.5">
+            <Brain className="w-4 h-4 mr-2" />
+            AI-Powered Location Intelligence
+          </Badge>
           
-          <h1 className="text-6xl md:text-8xl font-black text-gradient mb-8 leading-tight tracking-tight">
-            SiteSelect AI
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              SiteSelect AI
+            </span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-            Discover the perfect location for your business with AI-powered precision. 
-            <span className="text-foreground font-semibold"> Simply describe your vision</span>, and we'll 
-            unveil the ideal spots with intelligent analysis.
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
+            Discover the perfect location for your business with AI-powered precision.
+            <span className="text-foreground font-semibold block mt-2">
+              Simply describe your vision, and we'll unveil the ideal spots with intelligent analysis.
+            </span>
           </p>
         </div>
 
         {/* Features */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
-          <div className="group p-8 glass-card rounded-2xl hover:scale-105 transition-all duration-500 hover:shadow-glow">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-glow rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
-              <Brain className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-bold mb-3 text-foreground">AI Analysis</h3>
-            <p className="text-muted-foreground leading-relaxed">Advanced AI understands your requirements and finds suitable locations with unprecedented accuracy</p>
-          </div>
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <CardHeader>
+              <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-primary/20 transition-colors">
+                <Brain className="w-7 h-7 text-primary" />
+              </div>
+              <CardTitle className="text-xl">AI Analysis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base">
+                Advanced AI understands your requirements and finds suitable locations with unprecedented accuracy
+              </CardDescription>
+            </CardContent>
+          </Card>
           
-          <div className="group p-8 glass-card rounded-2xl hover:scale-105 transition-all duration-500 hover:shadow-accent">
-            <div className="w-16 h-16 bg-gradient-to-br from-accent to-accent/80 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
-              <MapPin className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-bold mb-3 text-foreground">Smart Mapping</h3>
-            <p className="text-muted-foreground leading-relaxed">Interactive maps with detailed location insights, demographic data, and comprehensive analytics</p>
-          </div>
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <CardHeader>
+              <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-primary/20 transition-colors">
+                <MapPin className="w-7 h-7 text-primary" />
+              </div>
+              <CardTitle className="text-xl">Smart Mapping</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base">
+                Interactive maps with detailed location insights, demographic data, and comprehensive analytics
+              </CardDescription>
+            </CardContent>
+          </Card>
           
-          <div className="group p-8 glass-card rounded-2xl hover:scale-105 transition-all duration-500 hover:shadow-lg">
-            <div className="w-16 h-16 bg-gradient-to-br from-success to-success/80 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-bold mb-3 text-foreground">Instant Results</h3>
-            <p className="text-muted-foreground leading-relaxed">Get ranked recommendations with detailed suitability scores and actionable insights in seconds</p>
-          </div>
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <CardHeader>
+              <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-primary/20 transition-colors">
+                <Zap className="w-7 h-7 text-primary" />
+              </div>
+              <CardTitle className="text-xl">Instant Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base">
+                Get ranked recommendations with detailed suitability scores and actionable insights in seconds
+              </CardDescription>
+            </CardContent>
+          </Card>
         </div>
 
         {/* CTA */}
         <div className="space-y-6">
           <Button 
-            variant="hero" 
             size="lg" 
             onClick={onGetStarted}
-            className="text-xl px-12 py-6 h-auto btn-glow font-bold tracking-wide group"
+            className="text-lg px-8 py-6 h-auto font-semibold group shadow-lg hover:shadow-xl transition-all duration-300"
           >
+            <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" />
             Find My Perfect Location
-            <MapPin className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
+            <MapPin className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
           </Button>
           
           <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
             <span className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               No registration required
             </span>
             <span className="flex items-center gap-2">
@@ -87,7 +105,7 @@ const Hero = ({ onGetStarted }: HeroProps) => {
               AI-powered analysis
             </span>
             <span className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
               Free to use
             </span>
           </div>

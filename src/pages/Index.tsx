@@ -3,8 +3,10 @@ import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
 import ThemeToggle from "@/components/ThemeToggle";
 import GoogleMap from "@/components/GoogleMap";
+import MapSkeleton from "@/components/MapSkeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles, RotateCcw } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, MapPin, RotateCcw, Navigation, Maximize2, Layers, Move3d } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
@@ -76,7 +78,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
+    <div className="min-h-screen bg-background">
       <ThemeToggle />
       
       {currentView === 'hero' && (
@@ -86,28 +88,28 @@ const Index = () => {
       {currentView === 'search' && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="border-b border-border/30 glass sticky top-0 z-50">
-            <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon"
                   onClick={handleBackToHome}
-                  className="hover:scale-110 transition-transform duration-200"
+                  aria-label="Back to home"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <h1 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-1.5 bg-gradient-to-br from-primary to-primary-glow rounded-lg">
-                    <Sparkles className="w-6 h-6 text-white" />
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="text-gradient">SiteSelect AI</span>
-                </h1>
+                  <h1 className="text-xl font-semibold">SiteSelect AI</h1>
+                </div>
               </div>
             </div>
           </header>
           
-          <div className="flex-1 py-8">
+          <div className="flex-1 flex items-center justify-center py-8">
             <QueryInput 
               onSearch={handleSubmit}
               isLoading={isLoading}
@@ -119,84 +121,122 @@ const Index = () => {
       {currentView === 'results' && cityCoordinates && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="border-b border-border/30 glass sticky top-0 z-50">
-            <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon"
                   onClick={() => setCurrentView('search')}
-                  className="hover:scale-110 transition-transform duration-200"
-                  title="Back to Search"
+                  aria-label="Back to search"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <h1 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-1.5 bg-gradient-to-br from-primary to-primary-glow rounded-lg">
-                    <Sparkles className="w-6 h-6 text-white" />
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="text-gradient">SiteSelect AI</span>
-                </h1>
+                  <h1 className="text-xl font-semibold">SiteSelect AI</h1>
+                </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline"
-                  onClick={handleNewSearch}
-                  className="hover:scale-105 transition-transform duration-200 font-semibold"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  New Search
-                </Button>
-              </div>
+              <Button 
+                variant="outline"
+                onClick={handleNewSearch}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                New Search
+              </Button>
             </div>
           </header>
           
           {/* Map Content */}
           <div className="flex-1 p-6">
-            <div className="max-w-6xl mx-auto">
-              <div className="mb-6">
-                <h2 className="text-3xl font-bold text-gradient mb-2">
-                  {currentCity}
-                </h2>
-                <p className="text-muted-foreground text-lg">
-                  Explore {currentCity} in 2D and 3D with satellite imagery and street views
-                </p>
-              </div>
-              
-              <GoogleMap 
-                city={currentCity}
-                coordinates={cityCoordinates}
-                className="animate-scale-up"
-              />
-              
-              {/* Additional Info Section */}
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="glass-card p-6 text-center">
-                  <h3 className="font-semibold text-lg mb-2">Coordinates</h3>
-                  <p className="text-muted-foreground">
-                    {cityCoordinates[1].toFixed(4)}°, {cityCoordinates[0].toFixed(4)}°
-                  </p>
-                </div>
-                <div className="glass-card p-6 text-center">
-                  <h3 className="font-semibold text-lg mb-2">View Modes</h3>
-                  <p className="text-muted-foreground">
-                    2D/3D, Satellite, Hybrid, Street
-                  </p>
-                </div>
-                <div className="glass-card p-6 text-center">
-                  <h3 className="font-semibold text-lg mb-2">3D Features</h3>
-                  <p className="text-muted-foreground">
-                    Buildings, Terrain, 45° Tilt
-                  </p>
-                </div>
-                <div className="glass-card p-6 text-center">
-                  <h3 className="font-semibold text-lg mb-2">Controls</h3>
-                  <p className="text-muted-foreground">
-                    Zoom, Rotate, Street View
-                  </p>
-                </div>
-              </div>
+            <div className="container mx-auto">
+              {isLoading ? (
+                <MapSkeleton />
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-3xl font-bold mb-2">
+                      {currentCity}
+                    </h2>
+                    <p className="text-muted-foreground text-lg">
+                      Explore {currentCity} in 2D and 3D with satellite imagery and street views
+                    </p>
+                  </div>
+                  
+                  <GoogleMap 
+                    city={currentCity}
+                    coordinates={cityCoordinates}
+                  />
+                  
+                  {/* Additional Info Cards */}
+                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Navigation className="h-4 w-4 text-muted-foreground" />
+                          Coordinates
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-bold">
+                          {cityCoordinates[1].toFixed(4)}°
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {cityCoordinates[0].toFixed(4)}°
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                          View Modes
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm font-medium">2D/3D Maps</p>
+                        <p className="text-sm text-muted-foreground">
+                          Satellite, Hybrid, Street
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Move3d className="h-4 w-4 text-muted-foreground" />
+                          3D Features
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm font-medium">Buildings & Terrain</p>
+                        <p className="text-sm text-muted-foreground">
+                          45° Tilt View
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                          Controls
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm font-medium">Full Navigation</p>
+                        <p className="text-sm text-muted-foreground">
+                          Zoom, Rotate, Street View
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
