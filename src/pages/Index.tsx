@@ -6,7 +6,6 @@ import GoogleMap from "@/components/GoogleMap";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'hero' | 'search' | 'results'>('hero');
@@ -19,24 +18,33 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      // Geocode the city to get coordinates
-      const geocodeResponse = await supabase.functions.invoke('geocode-city', {
-        body: { city }
-      });
-
-      if (geocodeResponse.error) {
-        throw new Error('Failed to find city location');
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('Google Maps API key not configured');
       }
 
-      const { city: cityData } = geocodeResponse.data;
+      // Use Google Maps Geocoding API directly
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city)}&key=${apiKey}`;
       
-      setCurrentCity(cityData.name);
-      setCityCoordinates([cityData.longitude, cityData.latitude]);
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+
+      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+        throw new Error('City not found');
+      }
+
+      const result = data.results[0];
+      const { lat, lng } = result.geometry.location;
+      const cityName = result.formatted_address;
+      
+      setCurrentCity(cityName);
+      setCityCoordinates([lng, lat]);
       setCurrentView('results');
       
       toast({
         title: "City Found! 🗺️",
-        description: `Showing map for ${cityData.name}`,
+        description: `Showing map for ${cityName}`,
       });
       
     } catch (error) {
