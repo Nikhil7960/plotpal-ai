@@ -380,7 +380,7 @@ export default function VacantSpaceDetector({
               
               <div className="grid gap-4">
                 {analysisResult.vacantSpaces.map((space, index) => (
-                  <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow"
+                  <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
                         onClick={() => {
                           setSelectedMarker(space);
                           if (mapRef.current) {
@@ -392,11 +392,11 @@ export default function VacantSpaceDetector({
                       <div className="space-y-3">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h4 className="font-semibold">{space.location}</h4>
+                            <h4 className="font-semibold text-foreground">{space.location}</h4>
                             <p className="text-sm text-muted-foreground">
                               {space.coordinates.lat.toFixed(6)}, {space.coordinates.lng.toFixed(6)}
                             </p>
-                            <p className="text-sm mt-1">{space.description}</p>
+                            <p className="text-sm mt-1 text-foreground">{space.description}</p>
                           </div>
                           <div className="text-right ml-4">
                             <div className="text-2xl font-bold text-green-600">
@@ -407,22 +407,32 @@ export default function VacantSpaceDetector({
                         </div>
                         
                         {space.reasons.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium mb-1 text-green-700">✓ Why this location:</p>
-                            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                          <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-md">
+                            <p className="text-sm font-medium mb-2 text-green-700 dark:text-green-400 flex items-center gap-1">
+                              <span className="text-green-600">✓</span> Why this location:
+                            </p>
+                            <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
                               {space.reasons.map((reason, i) => (
-                                <li key={i}>{reason}</li>
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-green-500 mt-0.5">•</span>
+                                  <span>{reason}</span>
+                                </li>
                               ))}
                             </ul>
                           </div>
                         )}
                         
                         {space.considerations.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium mb-1 text-orange-700">⚠ Considerations:</p>
-                            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                          <div className="bg-orange-50 dark:bg-orange-950/20 p-3 rounded-md">
+                            <p className="text-sm font-medium mb-2 text-orange-700 dark:text-orange-400 flex items-center gap-1">
+                              <span className="text-orange-600">⚠</span> Considerations:
+                            </p>
+                            <ul className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
                               {space.considerations.map((consideration, i) => (
-                                <li key={i}>{consideration}</li>
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-orange-500 mt-0.5">•</span>
+                                  <span>{consideration}</span>
+                                </li>
                               ))}
                             </ul>
                           </div>

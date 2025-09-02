@@ -55,56 +55,91 @@ export async function analyzeVacantSpaceWithGemini(
     const buildingDescription = BUILDING_CONTEXT[buildingType as keyof typeof BUILDING_CONTEXT] || buildingType;
     
     // Create comprehensive prompt
-    const prompt = `You are an expert urban planner and real estate developer with extensive knowledge in site selection and development. Analyze this satellite/map image to identify the BEST vacant or underutilized spaces suitable for building ${buildingDescription}.
+    const prompt = `You are an expert urban planner and real estate developer with 20+ years of experience in site selection and development. Analyze this satellite/map image to identify the BEST vacant or underutilized spaces suitable for building ${buildingDescription}.
 
 Location Context:
 - Area: ${location}
 - Map Center: ${mapCenter.lat.toFixed(6)}, ${mapCenter.lng.toFixed(6)}
 - Building Type: ${buildingType.toUpperCase()} (${buildingDescription})
 
-Analysis Requirements:
-1. Carefully examine the map image for:
-   - Empty lots or vacant land
-   - Underutilized areas (large parking lots, abandoned buildings)
-   - Areas suitable for redevelopment
-   - Proper size for the intended building type
+Critical Analysis Requirements:
 
-2. Consider critical factors:
-   - Accessibility and road connectivity
-   - Proximity to target demographics
-   - Available space size and shape
-   - Surrounding infrastructure quality
-   - Traffic accessibility
-   - Nearby complementary businesses
-   - Zoning compatibility (if visible)
-   - Environmental factors
+1. VACANT SPACE IDENTIFICATION:
+   - Look for empty lots, undeveloped land, large parking areas
+   - Identify old/abandoned buildings suitable for demolition/redevelopment
+   - Find underutilized spaces (oversized parking, vacant industrial areas)
+   - Assess lot sizes and shapes for development viability
 
-3. For ${buildingType} specifically consider:
+2. INFRASTRUCTURE & ACCESSIBILITY ANALYSIS:
+   - Road connectivity and traffic patterns
+   - Public transportation access
+   - Utility infrastructure visibility
+   - Emergency services accessibility
+   - Pedestrian and vehicle access points
+
+3. MARKET & DEMOGRAPHIC CONSIDERATIONS:
+   - Population density in surrounding areas
+   - Existing business types and competition
+   - Residential vs commercial mix
+   - Economic indicators from visible development quality
+   - Target customer accessibility
+
+4. REGULATORY & ENVIRONMENTAL FACTORS:
+   - Apparent zoning compatibility (residential/commercial/mixed-use areas)
+   - Environmental considerations (flood plains, slopes, green spaces)
+   - Proximity to sensitive areas (schools, hospitals, residential)
+   - Development constraints (powerlines, water bodies, protected areas)
+
+5. BUILDING-SPECIFIC REQUIREMENTS for ${buildingType}:
    ${getBuildingSpecificConsiderations(buildingType)}
 
-Please provide your analysis in this EXACT JSON format (no additional text):
+6. FINANCIAL VIABILITY INDICATORS:
+   - Land acquisition feasibility (apparent lot ownership patterns)
+   - Development cost factors (terrain, existing structures)
+   - Revenue potential based on location and foot traffic
+   - Competition analysis from visible businesses
+
+PROVIDE DETAILED ANALYSIS in this EXACT JSON format:
 {
   "vacantSpaces": [
     {
-      "location": "Specific descriptive location based on visible landmarks",
+      "location": "Specific location description using visible landmarks and directional references",
       "coordinates": { "lat": estimated_latitude, "lng": estimated_longitude },
-      "suitability": suitability_percentage_0_to_100,
-      "reasons": ["specific reason 1", "specific reason 2", "specific reason 3"],
-      "considerations": ["potential challenge 1", "consideration 2"],
-      "description": "Detailed description of the vacant space and why it's suitable"
+      "suitability": percentage_0_to_100,
+      "reasons": [
+        "Specific infrastructure advantage",
+        "Market opportunity insight", 
+        "Demographic benefit",
+        "Accessibility advantage"
+      ],
+      "considerations": [
+        "Specific regulatory challenge",
+        "Environmental or zoning concern",
+        "Market competition factor",
+        "Development complexity"
+      ],
+      "description": "Comprehensive 2-3 sentence description of the space, its current state, size estimate, and development potential"
     }
   ],
-  "analysis": "Overall analysis of the area for ${buildingType} development with market insights",
-  "confidence": confidence_level_0_to_100
+  "analysis": "Detailed market analysis covering: 1) Overall area assessment for ${buildingType} development 2) Market demand indicators 3) Competition landscape 4) Development timeline recommendations 5) Key success factors for this location",
+  "confidence": confidence_percentage_based_on_image_clarity_and_analysis_depth
 }
 
-Requirements:
-- Identify 2-4 most promising locations
-- Be specific about locations using visible landmarks
-- Estimate coordinates relative to the map center
-- Provide realistic suitability scores
-- Focus on practical development considerations
-- Consider the specific needs of ${buildingType}`;
+IMPORTANT REQUIREMENTS:
+- Identify 2-4 SPECIFIC, REALISTIC locations visible in the image
+- Use visible landmarks (roads, buildings, features) for location descriptions
+- Provide coordinates relative to map center with realistic offsets
+- Give honest suitability scores (40-95% range, avoid perfect scores)
+- Include both opportunities AND challenges
+- Focus on actionable insights for developers
+- Consider ${buildingType}-specific market demands and operational requirements
+- Analyze actual visible features, don't make assumptions about off-screen areas
+
+Quality Standards:
+- Suitability scores should reflect genuine development potential
+- Reasons must be specific to visible features and market analysis
+- Considerations should include real development challenges
+- Analysis should provide investment-grade insights`;
 
     // Prepare the image part
     const imagePart = {
@@ -177,15 +212,100 @@ Requirements:
 
 function getBuildingSpecificConsiderations(buildingType: string): string {
   const considerations = {
-    cafe: '- High foot traffic areas\n- Proximity to offices, schools, or residential areas\n- Parking availability\n- Visibility from street',
-    mall: '- Large open spaces (minimum 5-10 acres)\n- Highway accessibility\n- Population density\n- Existing retail infrastructure',
-    park: '- Open green spaces\n- Community accessibility\n- Environmental considerations\n- Connection to residential areas',
-    residential: '- Quiet areas away from industrial zones\n- School districts\n- Public transportation\n- Community amenities nearby',
-    office: '- Business district proximity\n- Transportation hubs\n- Parking facilities\n- Professional environment',
-    hospital: '- Emergency vehicle access\n- Large flat areas\n- Population density\n- Existing medical facilities',
-    school: '- Safe neighborhoods\n- Adequate space for buildings and playgrounds\n- Transportation accessibility\n- Residential area proximity',
-    gym: '- Residential or commercial areas\n- Parking availability\n- Ground floor access\n- Complementary businesses nearby'
+    cafe: `- Target 1,000-3,000 sq ft spaces with good street visibility
+- High foot traffic areas: office districts, universities, residential neighborhoods
+- Parking for 10-15 vehicles minimum
+- Ground floor locations with large windows preferred
+- Proximity to complementary businesses (bookstores, coworking spaces)
+- Morning commute routes and lunch-hour accessibility
+- Avoid industrial areas and low-density suburbs`,
+    
+    mall: `- Minimum 50,000-200,000 sq ft development area required
+- Highway accessibility and major road intersections critical
+- Population base of 100,000+ within 15-mile radius needed
+- Existing retail infrastructure and competitive analysis
+- Anchor tenant potential and customer parking (500+ spaces)
+- Public transportation connections beneficial
+- Avoid areas with declining economic indicators`,
+    
+    park: `- Minimum 2-5 acres for community park functionality
+- Central location accessible to multiple residential areas
+- Natural features: existing trees, water features, topography
+- Connection to pedestrian/bike path networks
+- Environmental considerations: drainage, soil quality
+- Community demographics: family density, age distribution
+- Avoid flood-prone areas and contaminated land`,
+    
+    residential: `- Quiet locations away from industrial and high-traffic areas
+- Proximity to quality schools and their district ratings
+- Public transportation access and commuter routes
+- Community amenities: shopping, healthcare, recreation
+- Utilities infrastructure capacity for development density
+- Property values and neighborhood appreciation trends
+- Zoning allows for intended residential density`,
+    
+    office: `- Business district proximity and professional environment
+- Transportation hubs and commuter accessibility
+- Parking ratios: 3-4 spaces per 1,000 sq ft office space
+- Fiber optic and telecommunications infrastructure
+- Proximity to business services, restaurants, hotels
+- Economic development zones and business incentives
+- Avoid residential-only and retail-dominated areas`,
+    
+    hospital: `- Large flat development area (10+ acres for full-service hospital)
+- Multiple emergency vehicle access routes required
+- Population density and healthcare service gaps analysis
+- Proximity to medical professional offices and specialists
+- Helicopter landing capability and flight path clearance
+- Utilities capacity for high-demand medical equipment
+- Avoid areas with noise restrictions and residential opposition`,
+    
+    school: `- Safe neighborhoods with low crime statistics
+- Adequate space: 10+ acres for elementary, 20+ for secondary
+- Transportation: bus routes and parent drop-off areas
+- Residential family density and enrollment projections
+- Distance from other schools to avoid overcrowding
+- Environmental safety: away from industrial, high-traffic areas
+- Community support and local education funding`,
+    
+    gym: `- Target demographics: young professionals, families
+- Parking for 50-100 vehicles depending on facility size
+- Ground floor access preferred, basement locations acceptable
+- Proximity to residential areas within 10-minute drive
+- Competition analysis: existing fitness facilities nearby
+- Complementary businesses: health food, sports retail
+- Avoid areas with declining demographics or oversaturation`,
+    
+    restaurant: `- High visibility locations with street-level access
+- Dinner hour accessibility and weekend foot traffic
+- Parking availability and valet service potential
+- Alcohol service regulations and licensing requirements
+- Competition density and cuisine type market gaps
+- Demographics matching target customer base and spending power
+- Delivery accessibility for food service platforms`,
+    
+    hotel: `- Transportation proximity: airports, highways, train stations
+- Business district or tourist attraction accessibility
+- Convention centers and corporate facilities nearby
+- Market demand analysis: business vs leisure travel
+- Competition from existing hotels and market saturation
+- Infrastructure for large-scale hospitality operations
+- Economic development and tourism growth indicators`,
+    
+    retail: `- High visibility and street-level customer access
+- Demographics matching target customer income levels
+- Foot traffic patterns and shopping behavior analysis
+- Parking convenience and public transportation access
+- Competition analysis and market positioning opportunities
+- Seasonal traffic variations and economic stability
+- Anchor businesses and shopping center synergies`
   };
   
-  return considerations[buildingType as keyof typeof considerations] || '- General development considerations\n- Infrastructure access\n- Community needs\n- Environmental factors';
+  return considerations[buildingType as keyof typeof considerations] || 
+    `- General site development considerations
+- Infrastructure access and utility capacity
+- Market demand analysis and competition assessment
+- Community needs alignment and demographic fit
+- Regulatory compliance and zoning requirements
+- Environmental impact and sustainability factors`;
 }
