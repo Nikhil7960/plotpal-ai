@@ -2,8 +2,7 @@ import { useState } from "react";
 import Hero from "@/components/Hero";
 import QueryInput from "@/components/QueryInput";
 import ThemeToggle from "@/components/ThemeToggle";
-import GoogleMap from "@/components/GoogleMap";
-import VacantSpaceDetector from "@/components/VacantSpaceDetector";
+import OSMVacantSpaceDetector from "@/components/OSMVacantSpaceDetector";
 import MapSkeleton from "@/components/MapSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,41 +13,20 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'hero' | 'search' | 'analysis'>('hero');
   const [isLoading, setIsLoading] = useState(false);
   const [currentCity, setCurrentCity] = useState('');
-  const [cityCoordinates, setCityCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
   const showCityMap = async (city: string, selectedBuildingType?: string) => {
     setIsLoading(true);
     
     try {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error('Google Maps API key not configured');
-      }
-
-      // Use Google Maps Geocoding API directly
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city)}&key=${apiKey}`;
-      
-      const response = await fetch(geocodeUrl);
-      const data = await response.json();
-
-      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-        throw new Error('City not found');
-      }
-
-      const result = data.results[0];
-      const { lat, lng } = result.geometry.location;
-      const cityName = result.formatted_address;
-      
-      setCurrentCity(cityName);
-      setCityCoordinates([lng, lat]);
+      // Set the city for the analysis view
+      setCurrentCity(city);
       
       // Go directly to analysis view for vacant space detection
       setCurrentView('analysis');
       toast({
-        title: "Map Ready for AI Analysis! 🤖",
-        description: `Map loaded for ${cityName}. Select what to build and analyze vacant spaces.`,
+        title: "Ready for AI Analysis! 🤖",
+        description: `Enter a location and analyze vacant spaces using OpenStreetMap and Qwen-VL.`,
       });
     } finally {
       setIsLoading(false);
@@ -62,13 +40,11 @@ const Index = () => {
   const handleNewSearch = () => {
     setCurrentView('search');
     setCurrentCity('');
-    setCityCoordinates(null);
   };
 
   const handleBackToHome = () => {
     setCurrentView('hero');
     setCurrentCity('');
-    setCityCoordinates(null);
   };
 
   return (
@@ -113,7 +89,7 @@ const Index = () => {
       )}
       
       {/* AI Analysis View */}
-      {currentView === 'analysis' && cityCoordinates && (
+      {currentView === 'analysis' && (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
@@ -149,10 +125,7 @@ const Index = () => {
           
           {/* Analysis Content */}
           <div className="flex-1 p-6">
-            <VacantSpaceDetector 
-              initialLocation={currentCity}
-              initialCoordinates={cityCoordinates}
-            />
+            <OSMVacantSpaceDetector initialLocation={currentCity || 'New York City'} />
           </div>
         </div>
       )}
