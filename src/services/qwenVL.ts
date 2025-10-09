@@ -1,3 +1,5 @@
+import { filterVacantSpacesWithGemini } from './geminiFilter';
+
 export interface VacantSpace {
   location: string;
   coordinates: { lat: number; lng: number };
@@ -139,11 +141,16 @@ Return ONLY valid JSON in this EXACT format:
       }));
     }
 
-    return {
+    const qwenResult = {
       vacantSpaces: result.vacantSpaces || [],
       analysis: result.analysis || 'Analysis completed',
       confidence: Math.min(100, Math.max(0, result.confidence || 80))
     };
+
+    // Apply Gemini filtering to remove inappropriate locations
+    const filteredResult = await filterVacantSpacesWithGemini(qwenResult, buildingType, location);
+    
+    return filteredResult;
     
   } catch (error) {
     console.error('Error analyzing with Qwen-VL:', error);

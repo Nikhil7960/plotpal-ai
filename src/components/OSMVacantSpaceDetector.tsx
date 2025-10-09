@@ -4,10 +4,15 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
-import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building } from 'lucide-react';
+import { Slider } from './ui/slider';
+import { Badge } from './ui/badge';
+import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building, Download, FileText, FileJson, Filter, MapPinned } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
 import { analyzeVacantSpaceWithQwenVL, geocodeLocation, type VacantSpace, type AnalysisResult } from '@/services/qwenVL';
+import { exportAnalysisAsJSON, exportAnalysisAsText } from '@/utils/export';
+import { fetchNearbyPOIs, type POICategory } from '@/utils/osmPOI';
+import { MapSkeleton, AnalysisProgress } from './LoadingStates';
 import OSMMap from './OSMMap';
 import L from 'leaflet';
 
@@ -38,8 +43,13 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
   const [buildingType, setBuildingType] = useState('');
   const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStage, setAnalysisStage] = useState<'capturing' | 'analyzing' | 'processing'>('capturing');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [markers, setMarkers] = useState<Array<{ position: [number, number]; title: string; description?: string }>>([]);
+  const [nearbyPOIs, setNearbyPOIs] = useState<POICategory[]>([]);
+  const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
+  const [minSuitability, setMinSuitability] = useState(0);
+  const [isMapLoading, setIsMapLoading] = useState(true);
 
   // Initialize map with NYC on first load
   useEffect(() => {
@@ -108,23 +118,27 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
       return;
     }
 
+    // Optional Gemini warning
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+      toast({
+        title: "Enhanced Filtering Available",
+        description: "Add VITE_GEMINI_API_KEY for improved filtering of inappropriate locations (lakes, seas, etc.)",
+        variant: "default",
+      });
+    }
+
     setIsAnalyzing(true);
     setAnalysisResult(null);
     setMarkers([]);
+    setNearbyPOIs([]);
 
     try {
-      toast({
-        title: "Capturing Map",
-        description: "Taking screenshot of the current map view...",
-      });
-      
+      // Stage 1: Capture
+      setAnalysisStage('capturing');
       const screenshotBase64 = await captureMapScreenshot();
       
-      toast({
-        title: "Analyzing with AI",
-        description: "Qwen-VL is analyzing the map for vacant spaces...",
-      });
-      
+      // Stage 2: Analyze
+      setAnalysisStage('analyzing');
       const result = await analyzeVacantSpaceWithQwenVL(
         screenshotBase64,
         buildingType,
@@ -132,6 +146,8 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
         { lat: mapCenter[0], lng: mapCenter[1] }
       );
       
+      // Stage 3: Process and fetch POIs
+      setAnalysisStage('processing');
       setAnalysisResult(result);
       
       // Create markers for vacant spaces
@@ -142,6 +158,16 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
           description: `${space.suitability}% suitable - ${space.description}`
         }));
         setMarkers(newMarkers);
+        
+        // Fetch nearby POIs for the first result
+        setIsLoadingPOIs(true);
+        const pois = await fetchNearbyPOIs(
+          result.vacantSpaces[0].coordinates.lat,
+          result.vacantSpaces[0].coordinates.lng,
+          500
+        );
+        setNearbyPOIs(pois);
+        setIsLoadingPOIs(false);
         
         toast({
           title: "Analysis Complete",
@@ -243,30 +269,68 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
           </div>
 
           {/* Analysis Progress */}
-          {isAnalyzing && (
-            <Alert>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>
-                Qwen-VL is analyzing the map image to identify vacant spaces suitable for your {buildingType}...
-              </AlertDescription>
-            </Alert>
-          )}
+          {isAnalyzing && <AnalysisProgress stage={analysisStage} />}
 
           {/* Results Section */}
           {analysisResult && analysisResult.vacantSpaces.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <BuildingIcon className="h-5 w-5" />
                   AI-Recommended Vacant Spaces for {BUILDING_TYPES.find(t => t.value === buildingType)?.label}
                 </h3>
-                <div className="text-sm text-muted-foreground">
-                  Confidence: {analysisResult.confidence}%
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    Confidence: {analysisResult.confidence}%
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => exportAnalysisAsJSON(location, buildingType, analysisResult)}
+                  >
+                    <FileJson className="h-4 w-4 mr-1" />
+                    JSON
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => exportAnalysisAsText(location, buildingType, analysisResult)}
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    Text
+                  </Button>
                 </div>
               </div>
               
+              {/* Filter Controls */}
+              <Card className="bg-muted/50">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Filter className="h-4 w-4" />
+                        Filter by Suitability Score
+                      </Label>
+                      <span className="text-sm font-medium">{minSuitability}%+</span>
+                    </div>
+                    <Slider
+                      value={[minSuitability]}
+                      onValueChange={(value) => setMinSuitability(value[0])}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Showing {analysisResult.vacantSpaces.filter(s => s.suitability >= minSuitability).length} of {analysisResult.vacantSpaces.length} locations
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              
               <div className="grid gap-4">
-                {analysisResult.vacantSpaces.map((space, index) => (
+                {analysisResult.vacantSpaces
+                  .filter(space => space.suitability >= minSuitability)
+                  .map((space, index) => (
                   <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
                         onClick={() => {
                           if (mapRef.current) {
@@ -338,6 +402,52 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                 {analysisResult.analysis}
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Nearby POIs */}
+          {nearbyPOIs.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MapPinned className="h-5 w-5" />
+                  Nearby Amenities (Top Location)
+                </CardTitle>
+                <CardDescription>
+                  Within 500m of the top-rated vacant space
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingPOIs ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading nearby amenities...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {nearbyPOIs.map((category, idx) => (
+                      <Card key={idx} className="bg-muted/30">
+                        <CardContent className="pt-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">{category.category}</h4>
+                              <Badge variant="outline">{category.count}</Badge>
+                            </div>
+                            <ul className="text-xs space-y-1">
+                              {category.items.slice(0, 3).map((poi, i) => (
+                                <li key={i} className="flex items-center justify-between text-muted-foreground">
+                                  <span className="truncate">{poi.name}</span>
+                                  <span className="ml-2 text-xs">{poi.distance}m</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </CardContent>
       </Card>
