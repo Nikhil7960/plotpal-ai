@@ -81,7 +81,7 @@ Return ONLY valid JSON in this EXACT format:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen2.5-vl-72b-instruct:free',
+        model: 'qwen/qwen2.5-vl-32b-instruct:free',
         messages: [
           {
             role: 'user',
