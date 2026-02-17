@@ -1,11 +1,11 @@
 # PlotPal AI - AI-Powered Vacant Space Detection
 
-An intelligent web application that uses Google Maps and Gemini AI to identify optimal vacant spaces for development projects.
+An intelligent web application that uses Google Maps and AI (OpenRouter vision + Groq filtering) to identify optimal vacant spaces for development projects.
 
 ## Features
 
 - 🗺️ **Interactive Maps**: Explore cities with Google Maps satellite imagery
-- 🤖 **AI Analysis**: Use Gemini AI to analyze map screenshots for vacant spaces
+- 🤖 **AI Analysis**: Use AI to analyze map screenshots for vacant spaces
 - 🏗️ **Building Type Selection**: Choose from cafes, malls, parks, residential, and more
 - 📍 **Smart Recommendations**: Get suitability scores and detailed reasoning
 - 🎯 **Location Insights**: Understand why a location is suitable for your project
@@ -15,7 +15,7 @@ An intelligent web application that uses Google Maps and Gemini AI to identify o
 1. **Enter Location**: Type in any city or address
 2. **Select Building Type**: Choose what you want to build (optional for AI analysis)
 3. **View Map**: Explore the area with satellite imagery
-4. **AI Analysis**: Capture map screenshot and analyze with Gemini AI
+4. **AI Analysis**: Capture map screenshot and analyze with AI
 5. **Get Recommendations**: View AI-identified vacant spaces with suitability scores
 
 ## Project Info
@@ -28,7 +28,8 @@ An intelligent web application that uses Google Maps and Gemini AI to identify o
 
 - Node.js & npm - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 - Google Maps API Key
-- Gemini AI API Key
+- OpenRouter API Key (for vision analysis)
+- Groq API Key (optional, for improved filtering)
 
 ### Installation
 
@@ -58,8 +59,11 @@ Create a `.env` file in the root directory with the following variables:
 # Google Maps API Key (required for maps functionality)
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 
-# Gemini AI API Key (required for vacant space analysis)
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
+# OpenRouter API Key (required for vacant space analysis / vision)
+VITE_OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Groq API Key (optional; for improved filtering of inappropriate locations)
+VITE_GROQ_API_KEY=your_groq_api_key_here
 ```
 
 #### Getting API Keys
@@ -73,11 +77,15 @@ VITE_GEMINI_API_KEY=your_gemini_api_key_here
    - Create credentials (API Key)
    - Restrict the key to your domain for security
 
-2. **Gemini AI API Key**:
-   - Visit [Google AI Studio](https://aistudio.google.com/)
-   - Sign in with your Google account
-   - Create a new API key
-   - Copy the key to your .env file
+2. **OpenRouter API Key**:
+   - Visit [OpenRouter](https://openrouter.ai/)
+   - Sign up and create an API key
+   - Used for vision model (e.g. Qwen-VL) to analyze map screenshots
+
+3. **Groq API Key** (optional):
+   - Visit [Groq Console](https://console.groq.com/)
+   - Create an API key
+   - Used for filtering out inappropriate locations (water bodies, etc.)
 
 ## How can I edit this code?
 
@@ -114,7 +122,7 @@ This project is built with:
 - **Frontend**: Vite + React + TypeScript
 - **UI Components**: shadcn/ui + Tailwind CSS
 - **Maps**: Google Maps JavaScript API
-- **AI**: Google Gemini AI
+- **AI**: OpenRouter (vision) + Groq (filtering)
 - **Image Capture**: html2canvas
 - **State Management**: React hooks
 
@@ -129,7 +137,7 @@ This project is built with:
 
 ### AI Analysis
 - Screenshot capture of map views
-- Gemini AI image analysis
+- AI image analysis (OpenRouter) and Groq filtering
 - Building-type specific recommendations
 - Suitability scoring (0-100%)
 - Detailed reasoning for each recommendation

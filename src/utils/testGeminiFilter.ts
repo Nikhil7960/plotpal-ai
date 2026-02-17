@@ -1,4 +1,4 @@
-// Test utility to verify Gemini filtering works correctly
+// Test utility to verify vacant-space filtering (Groq) works correctly
 import { filterVacantSpacesWithGemini } from '../services/geminiFilter';
 import { AnalysisResult } from '../services/qwenVL';
 
@@ -35,7 +35,7 @@ const mockQwenResult: AnalysisResult = {
 };
 
 export async function testGeminiFilter() {
-  console.log('Testing Gemini filtering...');
+  console.log('Testing Groq filtering...');
   console.log('Original results:', mockQwenResult.vacantSpaces.length, 'spaces');
   
   try {
@@ -55,5 +55,5 @@ export async function testGeminiFilter() {
   }
 }
 
-// Uncomment to run test
+// Uncomment to run test (requires VITE_GROQ_API_KEY)
 // testGeminiFilter();

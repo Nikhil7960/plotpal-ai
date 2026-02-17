@@ -12,8 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { analyzeVacantSpaceWithQwenVL, geocodeLocation, type VacantSpace, type AnalysisResult } from '@/services/qwenVL';
 import { exportAnalysisAsJSON, exportAnalysisAsText } from '@/utils/export';
 import { fetchNearbyPOIs, type POICategory } from '@/utils/osmPOI';
+import { leafletBoundsToExtent, buildArcGISViewerUrl, centerZoomToExtent } from '@/utils/mergemapSync';
 import { MapSkeleton, AnalysisProgress } from './LoadingStates';
 import OSMMap from './OSMMap';
+import ArcGISPropertyLookupIframe from './ArcGISPropertyLookupIframe';
 import L from 'leaflet';
 
 const BUILDING_TYPES = [
@@ -50,6 +52,11 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
   const [minSuitability, setMinSuitability] = useState(0);
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [arcgisUrl, setArcgisUrl] = useState(() =>
+    buildArcGISViewerUrl({ extent: centerZoomToExtent([40.7128, -74.0060], 15) })
+  );
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
+  const skipNextMoveend = useRef(true);
 
   // Initialize map with NYC on first load
   useEffect(() => {
@@ -65,6 +72,29 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
     };
     initializeLocation();
   }, []); // Only run once on mount
+
+  // Keep ArcGIS iframe URL in sync when mapCenter changes (e.g. after geocode)
+  useEffect(() => {
+    setArcgisUrl(buildArcGISViewerUrl({ extent: centerZoomToExtent(mapCenter, 15) }));
+  }, [mapCenter]);
+
+  const syncToArcgis = useCallback(() => {
+    if (skipNextMoveend.current) {
+      skipNextMoveend.current = false;
+      return;
+    }
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    const extent = leafletBoundsToExtent(bounds);
+    setArcgisUrl(buildArcGISViewerUrl({ extent }));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      mapRef.current?.off('moveend', syncToArcgis);
+    };
+  }, [syncToArcgis]);
 
   const captureMapScreenshot = useCallback(async (): Promise<string> => {
     if (!mapContainerRef.current) {
@@ -118,11 +148,10 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
       return;
     }
 
-    // Optional Gemini warning
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    if (!import.meta.env.VITE_GROQ_API_KEY) {
       toast({
         title: "Enhanced Filtering Available",
-        description: "Add VITE_GEMINI_API_KEY for improved filtering of inappropriate locations (lakes, seas, etc.)",
+        description: "Add VITE_GROQ_API_KEY for improved filtering of inappropriate locations (lakes, seas, etc.)",
         variant: "default",
       });
     }
@@ -263,8 +292,24 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
               markers={markers}
               onMapReady={(map) => {
                 mapRef.current = map;
+                const extent = leafletBoundsToExtent(map.getBounds());
+                setArcgisUrl(buildArcGISViewerUrl({ extent }));
+                map.on('moveend', syncToArcgis);
+                map.invalidateSize();
               }}
               showControls={true}
+            />
+          </div>
+
+          {/* ArcGIS Property Lookup – synced with map above (same implementation as /mergemap) */}
+          <div className="min-h-[400px] lg:min-h-0 flex flex-col space-y-2">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              ArcGIS Property Lookup (Mumbai)
+            </h2>
+            <ArcGISPropertyLookupIframe
+              src={arcgisUrl}
+              isLoading={isIframeLoading}
+              onLoad={() => setIsIframeLoading(false)}
             />
           </div>
 

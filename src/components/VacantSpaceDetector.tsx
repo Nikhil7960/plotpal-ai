@@ -9,7 +9,7 @@ import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, H
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
-import { analyzeVacantSpaceWithGemini, type VacantSpace, type AnalysisResult } from '@/services/gemini';
+import { analyzeVacantSpaceWithQwenVL, type VacantSpace, type AnalysisResult } from '@/services/qwenVL';
 
 const BUILDING_TYPES = [
   { value: 'cafe', label: 'Cafe', icon: Coffee },
@@ -157,11 +157,10 @@ export default function VacantSpaceDetector({
       return;
     }
 
-    // Check if Gemini API key is configured
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    if (!import.meta.env.VITE_OPENROUTER_API_KEY) {
       toast({
         title: "Configuration Error",
-        description: "Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your environment variables.",
+        description: "OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment variables.",
         variant: "destructive",
       });
       return;
@@ -180,13 +179,12 @@ export default function VacantSpaceDetector({
       
       const screenshotBase64 = await captureMapScreenshot();
       
-      // Step 2: Analyze with Gemini AI
       toast({
         title: "Analyzing with AI",
-        description: "Gemini AI is analyzing the map for vacant spaces...",
+        description: "AI is analyzing the map for vacant spaces...",
       });
       
-      const result = await analyzeVacantSpaceWithGemini(
+      const result = await analyzeVacantSpaceWithQwenVL(
         screenshotBase64,
         buildingType,
         location,

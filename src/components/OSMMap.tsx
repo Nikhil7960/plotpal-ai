@@ -25,6 +25,7 @@ interface OSMMapProps {
   }>;
   height?: string;
   showControls?: boolean;
+  defaultTileLayer?: 'satellite' | 'osm' | 'terrain';
 }
 
 // Map events handler
@@ -49,10 +50,11 @@ export default function OSMMap({
   onMapReady,
   markers = [],
   height = '600px',
-  showControls = true
+  showControls = true,
+  defaultTileLayer = 'satellite'
 }: OSMMapProps) {
   const mapRef = useRef<L.Map | null>(null);
-  const [tileLayer, setTileLayer] = useState<'satellite' | 'osm' | 'terrain'>('satellite');
+  const [tileLayer, setTileLayer] = useState<'satellite' | 'osm' | 'terrain'>(defaultTileLayer);
   
   const tileLayerConfig = {
     satellite: {
