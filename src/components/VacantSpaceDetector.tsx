@@ -157,10 +157,10 @@ export default function VacantSpaceDetector({
       return;
     }
 
-    if (!import.meta.env.VITE_OPENROUTER_API_KEY) {
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
       toast({
         title: "Configuration Error",
-        description: "OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment variables.",
+        description: "Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your environment variables.",
         variant: "destructive",
       });
       return;

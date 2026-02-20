@@ -1,4 +1,4 @@
-// Test utility to verify vacant-space filtering (Groq) works correctly
+// Test utility to verify vacant-space filtering (Gemini) works correctly
 import { filterVacantSpacesWithGemini } from '../services/geminiFilter';
 import { AnalysisResult } from '../services/qwenVL';
 
@@ -35,19 +35,19 @@ const mockQwenResult: AnalysisResult = {
 };
 
 export async function testGeminiFilter() {
-  console.log('Testing Groq filtering...');
+  console.log('Testing Gemini filtering...');
   console.log('Original results:', mockQwenResult.vacantSpaces.length, 'spaces');
-  
+
   try {
     const filteredResult = await filterVacantSpacesWithGemini(
       mockQwenResult,
       'cafe',
       'New York City'
     );
-    
+
     console.log('Filtered results:', filteredResult.vacantSpaces.length, 'spaces');
     console.log('Filtered spaces:', filteredResult.vacantSpaces.map(s => s.location));
-    
+
     return filteredResult;
   } catch (error) {
     console.error('Test failed:', error);
@@ -55,5 +55,5 @@ export async function testGeminiFilter() {
   }
 }
 
-// Uncomment to run test (requires VITE_GROQ_API_KEY)
+// Uncomment to run test (requires VITE_GEMINI_API_KEY)
 // testGeminiFilter();

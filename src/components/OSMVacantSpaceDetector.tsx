@@ -139,21 +139,13 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
       return;
     }
 
-    if (!import.meta.env.VITE_OPENROUTER_API_KEY) {
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
       toast({
         title: "Configuration Error",
-        description: "OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment variables.",
+        description: "Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your environment variables.",
         variant: "destructive",
       });
       return;
-    }
-
-    if (!import.meta.env.VITE_GROQ_API_KEY) {
-      toast({
-        title: "Enhanced Filtering Available",
-        description: "Add VITE_GROQ_API_KEY for improved filtering of inappropriate locations (lakes, seas, etc.)",
-        variant: "default",
-      });
     }
 
     setIsAnalyzing(true);

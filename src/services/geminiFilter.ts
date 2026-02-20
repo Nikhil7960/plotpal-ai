@@ -1,5 +1,4 @@
-// import { GoogleGenAI } from '@google/genai';  // Commented out: using Groq instead
-import { Groq } from 'groq-sdk';
+import { GoogleGenAI } from '@google/genai';
 import { VacantSpace, AnalysisResult } from './qwenVL';
 
 const SYSTEM_INSTRUCTION = `You are an expert urban planning validator. Your job is to filter out inappropriate vacant spaces that are NOT suitable for building development.
@@ -29,13 +28,13 @@ export async function filterVacantSpacesWithGemini(
   location: string
 ): Promise<AnalysisResult> {
   try {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      console.warn('Groq API key not configured, returning original results');
+      console.warn('Gemini API key not configured, returning original results');
       return qwenResult;
     }
 
-    const groq = new Groq({ apiKey });
+    const ai = new GoogleGenAI({ apiKey });
 
     const userContent = `Please filter these vacant spaces for ${buildingType} development in ${location}. Remove any inappropriate locations like water bodies, natural areas, or other unsuitable sites.
 
@@ -44,24 +43,21 @@ ${JSON.stringify(qwenResult, null, 2)}
 
 Return the filtered result in the EXACT same JSON format, keeping only suitable vacant spaces. If all spaces are inappropriate, return an empty vacantSpaces array but keep the original analysis and confidence.`;
 
-    // Groq implementation (Gemini code commented out below)
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: SYSTEM_INSTRUCTION },
-        { role: 'user', content: userContent }
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      config: {
+        temperature: 0.2,
+        systemInstruction: [{ text: SYSTEM_INSTRUCTION }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userContent }],
+        },
       ],
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.2,
-      max_completion_tokens: 1024,
-      top_p: 1,
-      stream: true,
-      stop: null
     });
 
-    let fullResponse = '';
-    for await (const chunk of chatCompletion) {
-      fullResponse += chunk.choices[0]?.delta?.content || '';
-    }
+    const fullResponse = response.text ?? '';
 
     // Parse the filtered response
     let filteredResult: AnalysisResult;
@@ -73,7 +69,7 @@ Return the filtered result in the EXACT same JSON format, keeping only suitable 
         throw new Error('No JSON found in response');
       }
     } catch (parseError) {
-      console.warn('Failed to parse Groq filter response, returning original results');
+      console.warn('Failed to parse Gemini filter response, returning original results');
       return qwenResult;
     }
 
@@ -97,9 +93,8 @@ Return the filtered result in the EXACT same JSON format, keeping only suitable 
       confidence: Math.min(100, Math.max(0, filteredResult.confidence || qwenResult.confidence))
     };
   } catch (error) {
-    console.error('Error filtering with Groq:', error);
-    console.warn('Groq filtering failed, returning original results');
+    console.error('Error filtering with Gemini:', error);
+    console.warn('Gemini filtering failed, returning original results');
     return qwenResult;
   }
 }
-

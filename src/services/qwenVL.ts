@@ -1,3 +1,4 @@
+import { GoogleGenAI } from '@google/genai';
 import { filterVacantSpacesWithGemini } from './geminiFilter';
 
 export interface VacantSpace {
@@ -36,13 +37,15 @@ export async function analyzeVacantSpaceWithQwenVL(
   mapCenter: { lat: number; lng: number }
 ): Promise<AnalysisResult> {
   try {
-    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('OpenRouter API key not configured');
+      throw new Error('Gemini API key not configured');
     }
 
+    const ai = new GoogleGenAI({ apiKey });
+
     const buildingDescription = BUILDING_CONTEXT[buildingType as keyof typeof BUILDING_CONTEXT] || buildingType;
-    
+
     const prompt = `You are an expert urban planner analyzing satellite imagery to identify vacant or underutilized spaces suitable for building ${buildingDescription}.
 
 Location: ${location}
@@ -72,58 +75,40 @@ Return ONLY valid JSON in this EXACT format:
   "confidence": <0-100>
 }`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'PlotPal AI',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'nvidia/nemotron-nano-12b-v2-vl:free',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: prompt
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/png;base64,${imageBase64}`
-                }
-              }
-            ]
-          }
-        ],
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      config: {
         temperature: 0.3,
-        max_tokens: 2000,
-        response_format: { type: "json_object" }
-      })
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: imageBase64,
+              },
+            },
+          ],
+        },
+      ],
     });
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
+    const content = response.text ?? '';
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
     // Parse the response
     let result: AnalysisResult;
     try {
-      result = JSON.parse(content);
-    } catch (parseError) {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error('Failed to parse AI response');
+        throw new Error('No JSON found in response');
       }
+    } catch (parseError) {
+      throw new Error('Failed to parse AI response');
     }
 
     // Validate and enhance the result
@@ -141,19 +126,19 @@ Return ONLY valid JSON in this EXACT format:
       }));
     }
 
-    const qwenResult = {
+    const geminiResult = {
       vacantSpaces: result.vacantSpaces || [],
       analysis: result.analysis || 'Analysis completed',
       confidence: Math.min(100, Math.max(0, result.confidence || 80))
     };
 
     // Apply Gemini filtering to remove inappropriate locations
-    const filteredResult = await filterVacantSpacesWithGemini(qwenResult, buildingType, location);
-    
+    const filteredResult = await filterVacantSpacesWithGemini(geminiResult, buildingType, location);
+
     return filteredResult;
-    
+
   } catch (error) {
-    console.error('Error analyzing with vision model:', error);
+    console.error('Error analyzing with Gemini:', error);
     throw new Error(`Failed to analyze vacant spaces: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -181,7 +166,7 @@ export async function geocodeLocation(address: string): Promise<{ lat: number; l
         lng: parseFloat(data[0].lon)
       };
     }
-    
+
     return null;
   } catch (error) {
     console.error('Geocoding error:', error);
