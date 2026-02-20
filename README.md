@@ -80,7 +80,7 @@ VITE_GROQ_API_KEY=your_groq_api_key_here
 2. **OpenRouter API Key**:
    - Visit [OpenRouter](https://openrouter.ai/)
    - Sign up and create an API key
-   - Used for vision model (e.g. Qwen-VL) to analyze map screenshots
+   - Used for vision model (e.g. Nemotron Nano VL) to analyze map screenshots
 
 3. **Groq API Key** (optional):
    - Visit [Groq Console](https://console.groq.com/)

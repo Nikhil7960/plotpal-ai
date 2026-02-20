@@ -39,7 +39,7 @@ export function ResultsSkeleton() {
 export function AnalysisProgress({ stage }: { stage: 'capturing' | 'analyzing' | 'processing' }) {
   const stages = {
     capturing: { text: 'Capturing map screenshot...', progress: 33 },
-    analyzing: { text: 'Qwen-VL is analyzing the image...', progress: 66 },
+    analyzing: { text: 'AI is analyzing the image...', progress: 66 },
     processing: { text: 'Processing results and finding POIs...', progress: 90 },
   };
 

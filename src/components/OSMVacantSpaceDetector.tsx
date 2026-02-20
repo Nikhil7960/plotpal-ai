@@ -235,7 +235,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
             Open Source Vacant Space Detector
           </CardTitle>
           <CardDescription>
-            Analyzing {location} with OpenStreetMap and Qwen-VL to find the best vacant spaces
+            Analyzing {location} with OpenStreetMap and AI vision to find the best vacant spaces
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

@@ -81,7 +81,7 @@ Return ONLY valid JSON in this EXACT format:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen2.5-vl-32b-instruct:free',
+        model: 'nvidia/nemotron-nano-12b-v2-vl:free',
         messages: [
           {
             role: 'user',
@@ -153,7 +153,7 @@ Return ONLY valid JSON in this EXACT format:
     return filteredResult;
     
   } catch (error) {
-    console.error('Error analyzing with Qwen-VL:', error);
+    console.error('Error analyzing with vision model:', error);
     throw new Error(`Failed to analyze vacant spaces: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

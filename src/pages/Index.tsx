@@ -26,7 +26,7 @@ const Index = () => {
       setCurrentView('analysis');
       toast({
         title: "Ready for AI Analysis! 🤖",
-        description: `Enter a location and analyze vacant spaces using OpenStreetMap and Qwen-VL.`,
+        description: `Enter a location and analyze vacant spaces using OpenStreetMap and AI vision.`,
       });
     } finally {
       setIsLoading(false);
