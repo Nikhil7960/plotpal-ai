@@ -1,0 +1,24 @@
+{
+  "name": "plotpal-research",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "grid": "npx tsx scripts/run-grid.ts",
+    "shortlist": "npx tsx scripts/run-shortlist.ts",
+    "sample": "npx tsx scripts/run-sample.ts",
+    "full": "npx tsx scripts/run-full.ts",
+    "judge": "npx tsx scripts/run-judge.ts",
+    "metrics": "npx tsx scripts/run-metrics.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.42.0",
+    "sharp": "^0.33.2",
+    "csv-stringify": "^6.5.2",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.3"
+  }
+}

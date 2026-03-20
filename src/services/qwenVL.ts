@@ -76,7 +76,7 @@ Return ONLY valid JSON in this EXACT format:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash',
       config: {
         temperature: 0.3,
       },

@@ -44,8 +44,9 @@ ${JSON.stringify(qwenResult, null, 2)}
 Return the filtered result in the EXACT same JSON format, keeping only suitable vacant spaces. If all spaces are inappropriate, return an empty vacantSpaces array but keep the original analysis and confidence.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash',
       config: {
+        
         temperature: 0.2,
         systemInstruction: [{ text: SYSTEM_INSTRUCTION }],
       },
