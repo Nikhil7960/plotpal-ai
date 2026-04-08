@@ -1,6 +1,14 @@
 import { Card, CardContent } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 
+export type AnalysisStage =
+  | 'capturing'
+  | 'context'
+  | 'analyzing'
+  | 'filtering'
+  | 'validating'
+  | 'processing';
+
 export function MapSkeleton() {
   return (
     <Card className="overflow-hidden">
@@ -36,14 +44,44 @@ export function ResultsSkeleton() {
   );
 }
 
-export function AnalysisProgress({ stage }: { stage: 'capturing' | 'analyzing' | 'processing' }) {
-  const stages = {
-    capturing: { text: 'Capturing map screenshot...', progress: 33 },
-    analyzing: { text: 'AI is analyzing the image...', progress: 66 },
-    processing: { text: 'Processing results and finding POIs...', progress: 90 },
-  };
+const STAGE_CONFIG: Record<AnalysisStage, { text: string; detail: string; progress: number }> = {
+  capturing: {
+    text: 'Capturing map screenshot...',
+    detail: 'Taking a high-resolution snapshot of the current view',
+    progress: 10,
+  },
+  context: {
+    text: 'Gathering location context...',
+    detail: 'Fetching land use data, water bodies, forests, and protected areas from OpenStreetMap',
+    progress: 25,
+  },
+  analyzing: {
+    text: 'AI is analyzing the image...',
+    detail: 'Gemini is identifying potential vacant spaces using satellite imagery and ground truth data',
+    progress: 45,
+  },
+  filtering: {
+    text: 'Verifying with Google Search...',
+    detail: 'Cross-referencing locations against web data for ownership, zoning, and restrictions',
+    progress: 65,
+  },
+  validating: {
+    text: 'Running hard validation checks...',
+    detail: 'Programmatically verifying each coordinate against OpenStreetMap zone data',
+    progress: 82,
+  },
+  processing: {
+    text: 'Finalizing results...',
+    detail: 'Processing validated results and fetching nearby amenities',
+    progress: 95,
+  },
+};
 
-  const current = stages[stage];
+const STAGE_ORDER: AnalysisStage[] = ['capturing', 'context', 'analyzing', 'filtering', 'validating', 'processing'];
+
+export function AnalysisProgress({ stage }: { stage: AnalysisStage }) {
+  const current = STAGE_CONFIG[stage];
+  const currentIndex = STAGE_ORDER.indexOf(stage);
 
   return (
     <Card className="border-primary/50 bg-primary/5">
@@ -55,13 +93,34 @@ export function AnalysisProgress({ stage }: { stage: 'capturing' | 'analyzing' |
             </div>
             <div className="flex-1">
               <p className="font-medium">{current.text}</p>
-              <p className="text-sm text-muted-foreground">This may take a few moments...</p>
+              <p className="text-sm text-muted-foreground">{current.detail}</p>
             </div>
           </div>
-          
+
+          {/* Step indicators */}
+          <div className="flex items-center gap-1">
+            {STAGE_ORDER.map((s, idx) => {
+              const isCompleted = idx < currentIndex;
+              const isActive = idx === currentIndex;
+              return (
+                <div key={s} className="flex-1 flex items-center gap-1">
+                  <div
+                    className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                      isCompleted
+                        ? 'bg-primary'
+                        : isActive
+                        ? 'bg-primary/60 animate-pulse'
+                        : 'bg-muted'
+                    }`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
           {/* Progress bar */}
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div 
+            <div
               className="bg-primary h-full transition-all duration-500 ease-out"
               style={{ width: `${current.progress}%` }}
             />

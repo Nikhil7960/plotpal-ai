@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { filterVacantSpacesWithGemini } from './geminiFilter';
+import type { LocationContext } from './locationContext';
 
 export interface VacantSpace {
   location: string;
@@ -8,6 +8,7 @@ export interface VacantSpace {
   reasons: string[];
   considerations: string[];
   description: string;
+  validationStatus?: 'verified' | 'unverified';
 }
 
 export interface AnalysisResult {
@@ -34,7 +35,9 @@ export async function analyzeVacantSpaceWithQwenVL(
   imageBase64: string,
   buildingType: string,
   location: string,
-  mapCenter: { lat: number; lng: number }
+  mapCenter: { lat: number; lng: number },
+  locationContext?: LocationContext,
+  propertyMapBase64?: string
 ): Promise<AnalysisResult> {
   try {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -46,24 +49,46 @@ export async function analyzeVacantSpaceWithQwenVL(
 
     const buildingDescription = BUILDING_CONTEXT[buildingType as keyof typeof BUILDING_CONTEXT] || buildingType;
 
+    // Build the ground truth section if location context is available
+    const groundTruthSection = locationContext
+      ? `\n== AREA CONTEXT (from OpenStreetMap) ==\n${locationContext.summary}\n`
+      : '';
+
+    const propertyMapNote = propertyMapBase64
+      ? '\nA second image is provided showing property/zoning map overlay for this area. Use it to identify zones marked for development or vacant parcels.\n'
+      : '';
+
     const prompt = `You are an expert urban planner analyzing satellite imagery to identify vacant or underutilized spaces suitable for building ${buildingDescription}.
 
 Location: ${location}
 Map Center: ${mapCenter.lat.toFixed(6)}, ${mapCenter.lng.toFixed(6)}
 Building Type: ${buildingType}
+${groundTruthSection}${propertyMapNote}
+== WHAT TO LOOK FOR ==
+Identify 2-4 spaces in the satellite image that appear suitable for development:
+1. Empty/cleared lots with no structures (bare earth, gravel, unused land)
+2. Large underutilized parking areas or open concrete areas
+3. Abandoned, derelict, or clearly unused buildings/compounds
+4. Underutilized industrial or commercial parcels
+5. Gaps between developed areas that appear vacant
 
-Analyze this satellite image and identify 2-4 BEST vacant spaces for development. Consider:
-1. Empty lots and undeveloped land
-2. Large parking areas that could be repurposed
-3. Abandoned or underutilized buildings
-4. Infrastructure and accessibility
-5. Surrounding context and zoning
+== WHAT TO AVOID ==
+Do NOT suggest locations that are:
+- Directly inside a visible water body (river, lake, ocean)
+- Inside a military installation
+- On top of existing occupied residential buildings or apartment complexes
+
+== IMPORTANT ==
+- Coordinates MUST be within the visible satellite image area (close to the map center)
+- Existing buildings with people living in them are NOT vacant — look for genuinely empty land
+- Urban areas often have small vacant plots between buildings — these ARE valid suggestions
+- If you can see open/bare land in the image, suggest it even if the area is densely developed nearby
 
 Return ONLY valid JSON in this EXACT format:
 {
   "vacantSpaces": [
     {
-      "location": "Descriptive location using visible landmarks",
+      "location": "Descriptive location using visible landmarks and streets",
       "coordinates": { "lat": <latitude>, "lng": <longitude> },
       "suitability": <0-100>,
       "reasons": ["Reason 1", "Reason 2", "Reason 3"],
@@ -75,6 +100,16 @@ Return ONLY valid JSON in this EXACT format:
   "confidence": <0-100>
 }`;
 
+    // Build content parts: prompt + satellite image + optional property map
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+      { text: prompt },
+      { inlineData: { mimeType: 'image/png', data: imageBase64 } },
+    ];
+
+    if (propertyMapBase64) {
+      parts.push({ inlineData: { mimeType: 'image/png', data: propertyMapBase64 } });
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       config: {
@@ -83,15 +118,7 @@ Return ONLY valid JSON in this EXACT format:
       contents: [
         {
           role: 'user',
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: 'image/png',
-                data: imageBase64,
-              },
-            },
-          ],
+          parts,
         },
       ],
     });
@@ -126,16 +153,11 @@ Return ONLY valid JSON in this EXACT format:
       }));
     }
 
-    const geminiResult = {
+    return {
       vacantSpaces: result.vacantSpaces || [],
       analysis: result.analysis || 'Analysis completed',
       confidence: Math.min(100, Math.max(0, result.confidence || 80))
     };
-
-    // Apply Gemini filtering to remove inappropriate locations
-    const filteredResult = await filterVacantSpacesWithGemini(geminiResult, buildingType, location);
-
-    return filteredResult;
 
   } catch (error) {
     console.error('Error analyzing with Gemini:', error);

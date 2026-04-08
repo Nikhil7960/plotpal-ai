@@ -6,14 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from './ui/alert';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
-import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building, Download, FileText, FileJson, Filter, MapPinned } from 'lucide-react';
+import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building, Download, FileText, FileJson, Filter, MapPinned, ShieldCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
 import { analyzeVacantSpaceWithQwenVL, geocodeLocation, type VacantSpace, type AnalysisResult } from '@/services/qwenVL';
+import { filterVacantSpacesWithGemini } from '@/services/geminiFilter';
+import { fetchLocationContext, reverseGeocode, validateAllCoordinates } from '@/services/locationContext';
 import { exportAnalysisAsJSON, exportAnalysisAsText } from '@/utils/export';
 import { fetchNearbyPOIs, type POICategory } from '@/utils/osmPOI';
-import { leafletBoundsToExtent, buildArcGISViewerUrl, centerZoomToExtent } from '@/utils/mergemapSync';
-import { MapSkeleton, AnalysisProgress } from './LoadingStates';
+import { leafletBoundsToExtent, buildArcGISViewerUrl, centerZoomToExtent, fetchArcGISMapExport } from '@/utils/mergemapSync';
+import { MapSkeleton, AnalysisProgress, type AnalysisStage } from './LoadingStates';
 import OSMMap from './OSMMap';
 import ArcGISPropertyLookupIframe from './ArcGISPropertyLookupIframe';
 import L from 'leaflet';
@@ -40,12 +42,12 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
   const { toast } = useToast();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  
+
   const [location, setLocation] = useState(initialLocation);
   const [buildingType, setBuildingType] = useState('');
   const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisStage, setAnalysisStage] = useState<'capturing' | 'analyzing' | 'processing'>('capturing');
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('capturing');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [markers, setMarkers] = useState<Array<{ position: [number, number]; title: string; description?: string }>>([]);
   const [nearbyPOIs, setNearbyPOIs] = useState<POICategory[]>([]);
@@ -103,7 +105,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const canvas = await html2canvas(mapContainerRef.current, {
         useCORS: true,
         allowTaint: true,
@@ -111,7 +113,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
         logging: false,
         scale: 1,
       });
-      
+
       const dataUrl = canvas.toDataURL('image/png', 0.8);
       return dataUrl.split(',')[1];
     } catch (error) {
@@ -154,54 +156,88 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
     setNearbyPOIs([]);
 
     try {
-      // Stage 1: Capture
+      // Stage 1: Capture map screenshot
       setAnalysisStage('capturing');
       const screenshotBase64 = await captureMapScreenshot();
-      
-      // Stage 2: Analyze
+
+      // Stage 2: Gather location context + reverse geocode + property map (in parallel)
+      setAnalysisStage('context');
+      const [locationContext, actualLocation, propertyMapBase64] = await Promise.all([
+        fetchLocationContext(mapCenter[0], mapCenter[1], 1000),
+        reverseGeocode(mapCenter[0], mapCenter[1]),
+        fetchArcGISMapExport(centerZoomToExtent(mapCenter, 15)).catch(() => null),
+      ]);
+
+      // Use reverse-geocoded location instead of stale search term
+      const analysisLocation = actualLocation || location;
+      console.log('Actual location (reverse geocoded):', analysisLocation);
+      console.log('Location context:', locationContext.summary);
+      console.log('Property map available:', !!propertyMapBase64);
+
+      // Stage 3: AI Analysis with ground truth context + property map
       setAnalysisStage('analyzing');
-      const result = await analyzeVacantSpaceWithQwenVL(
+      const rawResult = await analyzeVacantSpaceWithQwenVL(
         screenshotBase64,
         buildingType,
-        location,
-        { lat: mapCenter[0], lng: mapCenter[1] }
+        analysisLocation,
+        { lat: mapCenter[0], lng: mapCenter[1] },
+        locationContext,
+        propertyMapBase64 || undefined
       );
-      
-      // Stage 3: Process and fetch POIs
+      console.log(`AI found ${rawResult.vacantSpaces.length} candidate spaces`);
+
+      // Stage 4: Gemini filter with Overpass data context
+      setAnalysisStage('filtering');
+      const filteredResult = await filterVacantSpacesWithGemini(
+        rawResult, buildingType, analysisLocation, locationContext
+      );
+      console.log(`After filter: ${filteredResult.vacantSpaces.length} spaces remain`);
+
+      // Stage 5: Hard programmatic validation via Overpass is_in
+      setAnalysisStage('validating');
+      const validatedSpaces = await validateAllCoordinates(filteredResult.vacantSpaces);
+      console.log(`After hard validation: ${validatedSpaces.length} spaces verified`);
+
+      const finalResult: AnalysisResult = {
+        ...filteredResult,
+        vacantSpaces: validatedSpaces,
+      };
+
+      // Stage 6: Process and display results
       setAnalysisStage('processing');
-      setAnalysisResult(result);
-      
+      setAnalysisResult(finalResult);
+
       // Create markers for vacant spaces
-      if (result.vacantSpaces && result.vacantSpaces.length > 0) {
-        const newMarkers = result.vacantSpaces.map(space => ({
+      if (finalResult.vacantSpaces && finalResult.vacantSpaces.length > 0) {
+        const newMarkers = finalResult.vacantSpaces.map(space => ({
           position: [space.coordinates.lat, space.coordinates.lng] as [number, number],
           title: space.location,
           description: `${space.suitability}% suitable - ${space.description}`
         }));
         setMarkers(newMarkers);
-        
+
         // Fetch nearby POIs for the first result
         setIsLoadingPOIs(true);
         const pois = await fetchNearbyPOIs(
-          result.vacantSpaces[0].coordinates.lat,
-          result.vacantSpaces[0].coordinates.lng,
+          finalResult.vacantSpaces[0].coordinates.lat,
+          finalResult.vacantSpaces[0].coordinates.lng,
           500
         );
         setNearbyPOIs(pois);
         setIsLoadingPOIs(false);
-        
+
         toast({
           title: "Analysis Complete",
-          description: `Found ${result.vacantSpaces.length} potential locations with ${result.confidence}% confidence`,
+          description: `Found ${finalResult.vacantSpaces.length} verified locations with ${finalResult.confidence}% confidence`,
         });
       } else {
         toast({
           title: "No Suitable Locations",
-          description: "Could not identify suitable vacant spaces in this area. Try a different location or zoom level.",
+          description: "All candidate locations were filtered out (water, forest, protected areas, etc.). Try a different area with more urban development.",
           variant: "destructive",
         });
       }
-      
+
     } catch (error) {
       console.error('Analysis error:', error);
       toast({
@@ -214,8 +250,8 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
     }
   }, [buildingType, location, mapCenter, captureMapScreenshot, toast]);
 
-  const BuildingIcon = buildingType ? 
-    BUILDING_TYPES.find(t => t.value === buildingType)?.icon || Building2 : 
+  const BuildingIcon = buildingType ?
+    BUILDING_TYPES.find(t => t.value === buildingType)?.icon || Building2 :
     Building2;
 
   return (
@@ -256,7 +292,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
             </div>
 
             <div className="flex items-end">
-              <Button 
+              <Button
                 onClick={analyzeVacantSpaces}
                 disabled={isAnalyzing || !buildingType || !location}
                 className="w-full"
@@ -338,7 +374,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                   </Button>
                 </div>
               </div>
-              
+
               {/* Filter Controls */}
               <Card className="bg-muted/50">
                 <CardContent className="pt-6">
@@ -363,14 +399,14 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                   </div>
                 </CardContent>
               </Card>
-              
+
               <div className="grid gap-4">
                 {analysisResult.vacantSpaces
                   .filter(space => space.suitability >= minSuitability)
                   .map((space, index) => (
                   <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
                         onClick={() => {
-                          if (mapRef.current) {
+                          if (mapRef.current && space.coordinates?.lat && space.coordinates?.lng) {
                             mapRef.current.setView([space.coordinates.lat, space.coordinates.lng], 18);
                           }
                         }}>
@@ -378,9 +414,17 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                       <div className="space-y-3">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-foreground">{space.location}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-foreground">{space.location}</h4>
+                              {space.validationStatus === 'verified' && (
+                                <Badge variant="default" className="bg-green-600 text-white text-xs">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                  OSM Verified
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
-                              {space.coordinates.lat.toFixed(6)}, {space.coordinates.lng.toFixed(6)}
+                              {space.coordinates?.lat?.toFixed(6) ?? '—'}, {space.coordinates?.lng?.toFixed(6) ?? '—'}
                             </p>
                             <p className="text-sm mt-1 text-foreground">{space.description}</p>
                           </div>
@@ -391,11 +435,11 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                             <p className="text-xs text-muted-foreground">Suitability</p>
                           </div>
                         </div>
-                        
+
                         {space.reasons.length > 0 && (
                           <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-md">
                             <p className="text-sm font-medium mb-2 text-green-700 dark:text-green-400">
-                              ✓ Why this location:
+                              Why this location:
                             </p>
                             <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
                               {space.reasons.map((reason, i) => (
@@ -407,11 +451,11 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                             </ul>
                           </div>
                         )}
-                        
+
                         {space.considerations.length > 0 && (
                           <div className="bg-orange-50 dark:bg-orange-950/20 p-3 rounded-md">
                             <p className="text-sm font-medium mb-2 text-orange-700 dark:text-orange-400">
-                              ⚠ Considerations:
+                              Considerations:
                             </p>
                             <ul className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
                               {space.considerations.map((consideration, i) => (
@@ -429,6 +473,17 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                 ))}
               </div>
             </div>
+          )}
+
+          {/* No results after analysis */}
+          {analysisResult && analysisResult.vacantSpaces.length === 0 && (
+            <Alert>
+              <AlertDescription className="text-sm">
+                <strong>No suitable vacant spaces found in this area.</strong><br />
+                All candidate locations were eliminated during validation (water bodies, forests, protected areas, or other restricted zones).
+                Try navigating to an area with more urban development and re-analyze.
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* AI Analysis Text */}
