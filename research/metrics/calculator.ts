@@ -113,17 +113,18 @@ export function vacancyDetectionRate(results: CellResult[]): number {
 }
 
 /**
- * Per infrastructure type frequency — how often each type is recommended.
+ * Per building type frequency — how many spaces were generated for each type.
+ * Each CellResult is now scoped to a single building type (the production
+ * pipeline calls the model with one type per request).
  */
 export function perTypeFrequency(
   results: CellResult[]
 ): Record<string, number> {
   const freq: Record<string, number> = {};
   for (const r of results) {
-    for (const space of r.filteredResult.vacantSpaces) {
-      for (const type of space.recommendedTypes || []) {
-        freq[type] = (freq[type] || 0) + 1;
-      }
+    const count = r.filteredResult.vacantSpaces.length;
+    if (count > 0) {
+      freq[r.buildingType] = (freq[r.buildingType] || 0) + count;
     }
   }
   return freq;
