@@ -1,20 +1,31 @@
 import { GridCell, CellResult, ConsistencyResult } from '../types.js';
-import { processCell } from '../pipeline/runner.js';
 
 /**
  * Re-run pipeline on a cell and compare with original for consistency.
+ * Uses the same building type as the original result to make a fair comparison.
  */
 export async function checkConsistency(
   cell: GridCell,
   originalResult: CellResult
 ): Promise<ConsistencyResult> {
-  // Force re-run by calling processCell directly (bypasses checkpoint)
   const { analyzeCell, filterResult } = await import('../pipeline/gemini-client.js');
   const { stitchCellImage } = await import('../imagery/tile-stitcher.js');
+  const { fetchLocationContext } = await import('../pipeline/location-context.js');
 
   const imageBase64 = await stitchCellImage(cell);
-  const rerunPipeline = await analyzeCell(imageBase64, cell.center);
-  const rerunFiltered = await filterResult(rerunPipeline, cell.center);
+  const locationContext = await fetchLocationContext(cell.center.lat, cell.center.lng, 800);
+  const rerunPipeline = await analyzeCell(
+    imageBase64,
+    originalResult.buildingType,
+    cell.center,
+    locationContext
+  );
+  const rerunFiltered = await filterResult(
+    rerunPipeline,
+    originalResult.buildingType,
+    cell.center,
+    locationContext
+  );
 
   // Compare: count overlapping spaces by proximity (within ~100m)
   const origSpaces = originalResult.filteredResult.vacantSpaces;

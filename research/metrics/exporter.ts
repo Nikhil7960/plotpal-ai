@@ -41,9 +41,7 @@ export function exportCSV(results: CellResult[]): void {
             r.filteredResult.vacantSpaces.length
           ).toFixed(1)
         : '0',
-    recommendedTypes: r.filteredResult.vacantSpaces
-      .flatMap((s) => s.recommendedTypes || [])
-      .join(';'),
+    buildingType: r.buildingType,
     analysis: r.filteredResult.analysis,
     timestamp: r.timestamp,
     durationMs: r.durationMs,

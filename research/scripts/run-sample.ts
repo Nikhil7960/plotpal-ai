@@ -60,36 +60,39 @@ async function main() {
     try {
       console.log(`--- Processing ${cell.id} ---`);
 
-      // Run pipeline
-      const result = await processCell(cell, rateLimiter);
-      console.log(`  Spaces found: ${result.filteredResult.vacantSpaces.length}`);
-      console.log(`  Confidence: ${result.filteredResult.confidence}`);
-      console.log(`  Duration: ${result.durationMs}ms`);
+      // Run pipeline (now returns multiple results, one per building type)
+      const results = await processCell(cell, rateLimiter);
+      console.log(`  Building types tested: ${results.length}`);
 
-      // Validate
-      const spaces = result.filteredResult.vacantSpaces;
-      for (const space of spaces) {
-        const inBounds =
-          space.coordinates.lat >= cell.bounds.latMin &&
-          space.coordinates.lat <= cell.bounds.latMax &&
-          space.coordinates.lng >= cell.bounds.lngMin &&
-          space.coordinates.lng <= cell.bounds.lngMax;
+      for (const result of results) {
         console.log(
-          `  Space: ${space.location} | Types: ${(space.recommendedTypes || []).join(', ')} | In bounds: ${inBounds}`
+          `  [${result.buildingType}] spaces=${result.filteredResult.vacantSpaces.length} ` +
+            `confidence=${result.filteredResult.confidence} duration=${result.durationMs}ms`
         );
+
+        // Validate
+        for (const space of result.filteredResult.vacantSpaces) {
+          const inBounds =
+            space.coordinates.lat >= cell.bounds.latMin &&
+            space.coordinates.lat <= cell.bounds.latMax &&
+            space.coordinates.lng >= cell.bounds.lngMin &&
+            space.coordinates.lng <= cell.bounds.lngMax;
+          console.log(`     • ${space.location} | In bounds: ${inBounds}`);
+        }
+
+        // Run judge for the first result only
+        if (result === results[0]) {
+          await rateLimiter.acquire();
+          const score = await scoreResult(result);
+          console.log(
+            `     Judge: R=${score.relevance.score} F=${score.feasibility.score} ` +
+              `RQ=${score.reasoning_quality.score} GA=${score.geographic_accuracy.score} ` +
+              `C=${score.completeness.score} Overall=${score.overall_score}`
+          );
+        }
       }
 
-      // Run judge
-      await rateLimiter.acquire();
-      const score = await scoreResult(result);
-      console.log(
-        `  Judge scores: R=${score.relevance.score} F=${score.feasibility.score} ` +
-        `RQ=${score.reasoning_quality.score} GA=${score.geographic_accuracy.score} ` +
-        `C=${score.completeness.score} Overall=${score.overall_score}`
-      );
-
-      // Check image file exists
-      const imageExists = fs.existsSync(result.imageFile);
+      const imageExists = results.length > 0 && fs.existsSync(results[0].imageFile);
       console.log(`  Image saved: ${imageExists}`);
 
       console.log('');
