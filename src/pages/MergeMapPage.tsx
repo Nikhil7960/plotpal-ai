@@ -1,40 +1,25 @@
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import L from "leaflet";
 import OSMMap from "@/components/OSMMap";
-import ArcGISPropertyLookupIframe from "@/components/ArcGISPropertyLookupIframe";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import {
-  leafletBoundsToExtent,
-  buildArcGISViewerUrl,
-  centerZoomToExtent,
-} from "@/utils/mergemapSync";
+  attachArcGISParcelOverlay,
+  type ArcGISParcelOverlayHandle,
+  type ParcelStatus,
+} from "@/utils/arcgisParcels";
 
 const DEFAULT_CENTER: [number, number] = [19.076, 72.8777];
-const DEFAULT_ZOOM = 12;
+const DEFAULT_ZOOM = 17;
 
 export default function MergeMapPage() {
   const [searchParams] = useSearchParams();
   const mapRef = useRef<L.Map | null>(null);
-  const [arcgisUrl, setArcgisUrl] = useState<string>(() => {
-    const lat = searchParams.get("lat");
-    const lng = searchParams.get("lng");
-    const zoomParam = searchParams.get("zoom");
-    const center: [number, number] =
-      lat != null && lng != null
-        ? [parseFloat(lat), parseFloat(lng)]
-        : DEFAULT_CENTER;
-    const zoom =
-      zoomParam != null
-        ? Math.min(23, Math.max(0, parseInt(zoomParam, 10)))
-        : DEFAULT_ZOOM;
-    const extent = centerZoomToExtent(center, zoom);
-    return buildArcGISViewerUrl({ extent });
-  });
-  const [isIframeLoading, setIsIframeLoading] = useState(true);
-  const skipNextMoveend = useRef(true);
+  const overlayRef = useRef<ArcGISParcelOverlayHandle | null>(null);
+  const [showParcels, setShowParcels] = useState(true);
+  const [status, setStatus] = useState<ParcelStatus>({ kind: "idle" });
 
   const initialCenter = useMemo((): [number, number] => {
     const lat = searchParams.get("lat");
@@ -56,30 +41,39 @@ export default function MergeMapPage() {
     return DEFAULT_ZOOM;
   }, [searchParams]);
 
-  const syncToArcgis = useCallback(() => {
-    if (skipNextMoveend.current) {
-      skipNextMoveend.current = false;
-      return;
-    }
-    const map = mapRef.current;
-    if (!map) return;
-    const bounds = map.getBounds();
-    const extent = leafletBoundsToExtent(bounds);
-    setArcgisUrl(buildArcGISViewerUrl({ extent }));
-    setIsIframeLoading(true);
-  }, []);
-
   const onMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
-    map.on("moveend", syncToArcgis);
+    overlayRef.current?.destroy();
+    overlayRef.current = attachArcGISParcelOverlay({
+      map,
+      minZoom: 15,
+      onStatusChange: setStatus,
+    });
     map.invalidateSize();
-  }, [syncToArcgis]);
+  }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
-      mapRef.current?.off("moveend", syncToArcgis);
+      overlayRef.current?.destroy();
     };
-  }, [syncToArcgis]);
+  }, []);
+
+  const statusLabel = (() => {
+    switch (status.kind) {
+      case "loading":
+        return "Loading parcels…";
+      case "hidden-zoom":
+        return `Zoom in to level ${status.minZoom}+ to see parcels`;
+      case "hidden-area":
+        return "Zoom in further — area too wide";
+      case "ready":
+        return `Showing ${status.landParcels} parcels, ${status.finalPlots} final plots`;
+      case "error":
+        return `Failed: ${status.message}`;
+      default:
+        return showParcels ? "Property overlay ready" : "Property overlay hidden";
+    }
+  })();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -94,38 +88,37 @@ export default function MergeMapPage() {
             <div>
               <h1 className="text-xl font-semibold">Merge Map</h1>
               <p className="text-sm text-muted-foreground">
-                Pan or zoom the left map; the right map updates when you release.
+                Mumbai property parcels overlaid on OpenStreetMap / satellite. Zoom 15+ to see parcels.
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <Button
+              size="sm"
+              variant={showParcels ? "default" : "outline"}
+              onClick={() => {
+                const next = !showParcels;
+                setShowParcels(next);
+                overlayRef.current?.setVisible(next);
+              }}
+            >
+              {showParcels ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+              Property overlay
+            </Button>
+            <span className="text-muted-foreground">{statusLabel}</span>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 min-h-0">
-        <div className="min-h-[400px] lg:min-h-0 flex flex-col">
-          <h2 className="text-sm font-medium text-muted-foreground mb-2">
-            Leaflet (source of truth)
-          </h2>
-          <div className="flex-1 min-h-[300px] rounded-lg overflow-hidden border">
-            <OSMMap
-              center={initialCenter}
-              zoom={initialZoom}
-              onMapReady={onMapReady}
-              height="500px"
-              showControls={true}
-              defaultTileLayer="osm"
-            />
-          </div>
-        </div>
-
-        <div className="min-h-[400px] lg:min-h-0 flex flex-col">
-          <h2 className="text-sm font-medium text-muted-foreground mb-2">
-            ArcGIS Property Lookup (Mumbai)
-          </h2>
-          <ArcGISPropertyLookupIframe
-            src={arcgisUrl}
-            isLoading={isIframeLoading}
-            onLoad={() => setIsIframeLoading(false)}
+      <div className="flex-1 p-4 min-h-0">
+        <div className="min-h-[500px] h-[calc(100vh-9rem)] rounded-lg overflow-hidden border">
+          <OSMMap
+            center={initialCenter}
+            zoom={initialZoom}
+            onMapReady={onMapReady}
+            height="100%"
+            showControls={true}
+            defaultTileLayer="satellite"
           />
         </div>
       </div>

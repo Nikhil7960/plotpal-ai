@@ -6,18 +6,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from './ui/alert';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
-import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building, Download, FileText, FileJson, Filter, MapPinned, ShieldCheck } from 'lucide-react';
+import { Loader2, MapPin, Camera, Building2, Trees, Coffee, ShoppingBag, Home, Hospital, GraduationCap, Dumbbell, Utensils, Building, Download, FileText, FileJson, Filter, MapPinned, ShieldCheck, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
 import { analyzeVacantSpaceWithQwenVL, geocodeLocation, type VacantSpace, type AnalysisResult } from '@/services/qwenVL';
 import { filterVacantSpacesWithGemini } from '@/services/geminiFilter';
 import { fetchLocationContext, reverseGeocode, validateAllCoordinates } from '@/services/locationContext';
+import { auditVacantSpaces } from '@/services/visualAudit';
+import type { ImageBounds, ImageSize } from '@/services/imageCoords';
 import { exportAnalysisAsJSON, exportAnalysisAsText } from '@/utils/export';
 import { fetchNearbyPOIs, type POICategory } from '@/utils/osmPOI';
-import { leafletBoundsToExtent, buildArcGISViewerUrl, centerZoomToExtent, fetchArcGISMapExport } from '@/utils/mergemapSync';
-import { MapSkeleton, AnalysisProgress, type AnalysisStage } from './LoadingStates';
+import { centerZoomToExtent, fetchArcGISMapExport } from '@/utils/mergemapSync';
+import { attachArcGISParcelOverlay, type ArcGISParcelOverlayHandle, type ParcelStatus } from '@/utils/arcgisParcels';
+import { createPlan } from '@/services/buildPlan/planStore';
+import type { InfraType } from '@/services/buildPlan/types';
+import { AnalysisProgress, type AnalysisStage } from './LoadingStates';
 import OSMMap from './OSMMap';
-import ArcGISPropertyLookupIframe from './ArcGISPropertyLookupIframe';
 import L from 'leaflet';
 
 const BUILDING_TYPES = [
@@ -38,14 +43,67 @@ interface OSMVacantSpaceDetectorProps {
   initialLocation?: string;
 }
 
+function ParcelOverlayStatus({
+  show,
+  status,
+  onToggle,
+}: {
+  show: boolean;
+  status: ParcelStatus;
+  onToggle: (next: boolean) => void;
+}) {
+  let label = '';
+  let tone = 'text-muted-foreground';
+  switch (status.kind) {
+    case 'idle':
+      label = show ? 'Property overlay ready' : 'Property overlay hidden';
+      break;
+    case 'loading':
+      label = 'Loading property parcels…';
+      break;
+    case 'hidden-zoom':
+      label = `Zoom in to level ${status.minZoom}+ to see property parcels`;
+      tone = 'text-amber-600 dark:text-amber-400';
+      break;
+    case 'hidden-area':
+      label = 'Zoom in further — area too wide to fetch parcels';
+      tone = 'text-amber-600 dark:text-amber-400';
+      break;
+    case 'ready':
+      label = `Showing ${status.landParcels} parcels, ${status.finalPlots} final plots`;
+      tone = 'text-green-600 dark:text-green-400';
+      break;
+    case 'error':
+      label = `Parcel load failed: ${status.message}`;
+      tone = 'text-red-600 dark:text-red-400';
+      break;
+  }
+  return (
+    <div className="absolute left-3 bottom-3 z-[1000] flex items-center gap-2 rounded-md bg-background/90 backdrop-blur px-2.5 py-1.5 shadow border text-xs">
+      <Button
+        size="sm"
+        variant={show ? 'default' : 'outline'}
+        className="h-7 px-2"
+        onClick={() => onToggle(!show)}
+      >
+        {show ? <Eye className="h-3.5 w-3.5 mr-1" /> : <EyeOff className="h-3.5 w-3.5 mr-1" />}
+        Property overlay
+      </Button>
+      {show && <span className={tone}>{label}</span>}
+    </div>
+  );
+}
+
 export default function OSMVacantSpaceDetector({ initialLocation = 'New York City' }: OSMVacantSpaceDetectorProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const parcelOverlayRef = useRef<ArcGISParcelOverlayHandle | null>(null);
 
   const [location, setLocation] = useState(initialLocation);
   const [buildingType, setBuildingType] = useState('');
-  const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]); // NYC default
+  const [mapCenter, setMapCenter] = useState<[number, number]>([19.076, 72.8777]); // Mumbai default
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('capturing');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -53,73 +111,81 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
   const [nearbyPOIs, setNearbyPOIs] = useState<POICategory[]>([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
   const [minSuitability, setMinSuitability] = useState(0);
-  const [isMapLoading, setIsMapLoading] = useState(true);
-  const [arcgisUrl, setArcgisUrl] = useState(() =>
-    buildArcGISViewerUrl({ extent: centerZoomToExtent([40.7128, -74.0060], 15) })
-  );
-  const [isIframeLoading, setIsIframeLoading] = useState(true);
-  const skipNextMoveend = useRef(true);
+  const [showParcels, setShowParcels] = useState(true);
+  const [parcelStatus, setParcelStatus] = useState<ParcelStatus>({ kind: 'idle' });
 
-  // Initialize map with NYC on first load
+  // Initialize map with geocoded location on first load
   useEffect(() => {
     const initializeLocation = async () => {
       const coords = await geocodeLocation(location);
       if (coords) {
         const newCenter: [number, number] = [coords.lat, coords.lng];
         setMapCenter(newCenter);
-        if (mapRef.current) {
-          mapRef.current.setView(newCenter, 15);
-        }
       }
     };
     initializeLocation();
   }, []); // Only run once on mount
 
-  // Keep ArcGIS iframe URL in sync when mapCenter changes (e.g. after geocode)
+  // When mapCenter updates (after geocoding or prop change), recenter the map.
   useEffect(() => {
-    setArcgisUrl(buildArcGISViewerUrl({ extent: centerZoomToExtent(mapCenter, 15) }));
+    if (mapRef.current) {
+      mapRef.current.setView(mapCenter, 17);
+    }
   }, [mapCenter]);
 
-  const syncToArcgis = useCallback(() => {
-    if (skipNextMoveend.current) {
-      skipNextMoveend.current = false;
-      return;
-    }
-    const map = mapRef.current;
-    if (!map) return;
-    const bounds = map.getBounds();
-    const extent = leafletBoundsToExtent(bounds);
-    setArcgisUrl(buildArcGISViewerUrl({ extent }));
+  const handleMapReady = useCallback((map: L.Map) => {
+    mapRef.current = map;
+    parcelOverlayRef.current?.destroy();
+    parcelOverlayRef.current = attachArcGISParcelOverlay({
+      map,
+      minZoom: 15,
+      onStatusChange: setParcelStatus,
+    });
+    map.invalidateSize();
+  }, []);
+
+  const handleToggleParcels = useCallback((next: boolean) => {
+    setShowParcels(next);
+    parcelOverlayRef.current?.setVisible(next);
   }, []);
 
   useEffect(() => {
     return () => {
-      mapRef.current?.off('moveend', syncToArcgis);
+      parcelOverlayRef.current?.destroy();
     };
-  }, [syncToArcgis]);
+  }, []);
 
-  const captureMapScreenshot = useCallback(async (): Promise<string> => {
-    if (!mapContainerRef.current) {
-      throw new Error('Map container not found');
+  const captureMapScreenshot = useCallback(async (): Promise<{
+    base64: string;
+    bounds: ImageBounds;
+    size: ImageSize;
+  }> => {
+    if (!mapContainerRef.current || !mapRef.current) {
+      throw new Error('Map container not ready');
     }
 
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const canvas = await html2canvas(mapContainerRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-        scale: 1,
-      });
+    const canvas = await html2canvas(mapContainerRef.current, {
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false,
+      scale: 1,
+    });
 
-      const dataUrl = canvas.toDataURL('image/png', 0.8);
-      return dataUrl.split(',')[1];
-    } catch (error) {
-      console.error('Screenshot error:', error);
-      throw new Error('Failed to capture map screenshot');
-    }
+    const dataUrl = canvas.toDataURL('image/png', 0.8);
+    const base64 = dataUrl.split(',')[1];
+
+    const mapBounds = mapRef.current.getBounds();
+    const bounds: ImageBounds = {
+      north: mapBounds.getNorth(),
+      south: mapBounds.getSouth(),
+      east: mapBounds.getEast(),
+      west: mapBounds.getWest(),
+    };
+    const size: ImageSize = { width: canvas.width, height: canvas.height };
+    return { base64, bounds, size };
   }, []);
 
   const analyzeVacantSpaces = useCallback(async () => {
@@ -158,14 +224,29 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
     try {
       // Stage 1: Capture map screenshot
       setAnalysisStage('capturing');
-      const screenshotBase64 = await captureMapScreenshot();
+      const { base64: screenshotBase64, bounds: imageBounds, size: imageSize } = await captureMapScreenshot();
 
       // Stage 2: Gather location context + reverse geocode + property map (in parallel)
       setAnalysisStage('context');
+      const currentMap = mapRef.current;
+      const currentBounds = currentMap?.getBounds();
+      const currentCenter: [number, number] = currentMap
+        ? [currentMap.getCenter().lat, currentMap.getCenter().lng]
+        : mapCenter;
+      const propertyExtent = currentBounds
+        ? [
+            currentBounds.getWest(),
+            currentBounds.getSouth(),
+            currentBounds.getEast(),
+            currentBounds.getNorth(),
+          ]
+            .map((n) => n.toFixed(6))
+            .join(',')
+        : centerZoomToExtent(currentCenter, 17);
       const [locationContext, actualLocation, propertyMapBase64] = await Promise.all([
-        fetchLocationContext(mapCenter[0], mapCenter[1], 1000),
-        reverseGeocode(mapCenter[0], mapCenter[1]),
-        fetchArcGISMapExport(centerZoomToExtent(mapCenter, 15)).catch(() => null),
+        fetchLocationContext(currentCenter[0], currentCenter[1], 1000),
+        reverseGeocode(currentCenter[0], currentCenter[1]),
+        fetchArcGISMapExport(propertyExtent).catch(() => null),
       ]);
 
       // Use reverse-geocoded location instead of stale search term
@@ -174,7 +255,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
       console.log('Location context:', locationContext.summary);
       console.log('Property map available:', !!propertyMapBase64);
 
-      // Stage 3: AI Analysis with ground truth context + property map
+      // Stage 3: AI Analysis (pixel-based coords, converted to lat/lng in code)
       setAnalysisStage('analyzing');
       const rawResult = await analyzeVacantSpaceWithQwenVL(
         screenshotBase64,
@@ -182,20 +263,30 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
         analysisLocation,
         { lat: mapCenter[0], lng: mapCenter[1] },
         locationContext,
-        propertyMapBase64 || undefined
+        propertyMapBase64 || undefined,
+        imageBounds,
+        imageSize,
       );
       console.log(`AI found ${rawResult.vacantSpaces.length} candidate spaces`);
 
-      // Stage 4: Gemini filter with Overpass data context
+      // Stage 4: Gemini filter — drop hard blockers (water, military, transport)
       setAnalysisStage('filtering');
       const filteredResult = await filterVacantSpacesWithGemini(
         rawResult, buildingType, analysisLocation, locationContext
       );
       console.log(`After filter: ${filteredResult.vacantSpaces.length} spaces remain`);
 
+      // Stage 4.5: Visual audit — re-inspect the image and drop spaces that
+      // don't actually land on vacant pixels. This is the main quality gate.
+      setAnalysisStage('auditing');
+      const { kept: auditedSpaces, audits } = await auditVacantSpaces(
+        filteredResult.vacantSpaces, screenshotBase64, imageBounds, imageSize
+      );
+      console.log(`After visual audit: ${auditedSpaces.length} spaces remain`, audits);
+
       // Stage 5: Hard programmatic validation via Overpass is_in
       setAnalysisStage('validating');
-      const validatedSpaces = await validateAllCoordinates(filteredResult.vacantSpaces);
+      const validatedSpaces = await validateAllCoordinates(auditedSpaces);
       console.log(`After hard validation: ${validatedSpaces.length} spaces verified`);
 
       const finalResult: AnalysisResult = {
@@ -316,28 +407,15 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
           <div ref={mapContainerRef} className="relative z-10">
             <OSMMap
               center={mapCenter}
-              zoom={15}
+              zoom={17}
               markers={markers}
-              onMapReady={(map) => {
-                mapRef.current = map;
-                const extent = leafletBoundsToExtent(map.getBounds());
-                setArcgisUrl(buildArcGISViewerUrl({ extent }));
-                map.on('moveend', syncToArcgis);
-                map.invalidateSize();
-              }}
+              onMapReady={handleMapReady}
               showControls={true}
             />
-          </div>
-
-          {/* ArcGIS Property Lookup – synced with map above (same implementation as /mergemap) */}
-          <div className="min-h-[400px] lg:min-h-0 flex flex-col space-y-2">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              ArcGIS Property Lookup (Mumbai)
-            </h2>
-            <ArcGISPropertyLookupIframe
-              src={arcgisUrl}
-              isLoading={isIframeLoading}
-              onLoad={() => setIsIframeLoading(false)}
+            <ParcelOverlayStatus
+              show={showParcels}
+              status={parcelStatus}
+              onToggle={handleToggleParcels}
             />
           </div>
 
@@ -404,12 +482,7 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                 {analysisResult.vacantSpaces
                   .filter(space => space.suitability >= minSuitability)
                   .map((space, index) => (
-                  <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
-                        onClick={() => {
-                          if (mapRef.current && space.coordinates?.lat && space.coordinates?.lng) {
-                            mapRef.current.setView([space.coordinates.lat, space.coordinates.lng], 18);
-                          }
-                        }}>
+                  <Card key={index} className="hover:shadow-md transition-shadow border-2 hover:border-primary/20">
                     <CardContent className="pt-6">
                       <div className="space-y-3">
                         <div className="flex justify-between items-start">
@@ -467,6 +540,42 @@ export default function OSMVacantSpaceDetector({ initialLocation = 'New York Cit
                             </ul>
                           </div>
                         )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (mapRef.current && space.coordinates?.lat && space.coordinates?.lng) {
+                                mapRef.current.setView([space.coordinates.lat, space.coordinates.lng], 18);
+                              }
+                            }}
+                          >
+                            <MapPin className="h-4 w-4 mr-1" />
+                            Focus on map
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const plan = createPlan({
+                                space: {
+                                  location: space.location,
+                                  coordinates: space.coordinates,
+                                  suitability: space.suitability,
+                                  description: space.description,
+                                  reasons: space.reasons,
+                                  considerations: space.considerations,
+                                },
+                                infra: buildingType as InfraType,
+                                searchLocation: location,
+                              });
+                              navigate(`/plan/${plan.id}`);
+                            }}
+                          >
+                            Generate Build Plan
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

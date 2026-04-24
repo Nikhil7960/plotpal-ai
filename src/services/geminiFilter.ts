@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { AnalysisResult } from './qwenVL';
 import type { LocationContext } from './locationContext';
+import { generateContentWithFallback } from './geminiRetry';
 
 const SYSTEM_INSTRUCTION = `You are an urban planning quality checker. Your job is to review proposed development sites and remove only CLEARLY inappropriate ones.
 
@@ -80,8 +81,7 @@ Return ONLY this JSON (no other text, no markdown fences):
 The keepIndices array MUST contain the integer index numbers (0-based) of spaces to KEEP.
 Bias heavily toward keeping — only remove if clearly unsuitable.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const response = await generateContentWithFallback(ai, {
       config: {
         temperature: 0.2,
         systemInstruction: [{ text: SYSTEM_INSTRUCTION }],

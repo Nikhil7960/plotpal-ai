@@ -31,16 +31,19 @@ interface OSMMapProps {
 // Map events handler
 function MapEventsHandler({ onMapReady, mapRef }: { onMapReady?: (map: L.Map) => void; mapRef: React.MutableRefObject<L.Map | null> }) {
   const map = useMap();
-  
+  const firedForRef = useRef<L.Map | null>(null);
+
   useEffect(() => {
-    if (map) {
-      mapRef.current = map;
-      if (onMapReady) {
-        onMapReady(map);
-      }
+    if (!map) return;
+    mapRef.current = map;
+    // Only notify once per map instance, even if onMapReady identity changes
+    // on parent re-renders.
+    if (firedForRef.current !== map) {
+      firedForRef.current = map;
+      onMapReady?.(map);
     }
   }, [map, mapRef, onMapReady]);
-  
+
   return null;
 }
 

@@ -30,10 +30,42 @@ export interface CoordinateValidation {
   warnings: string[];
 }
 
-const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_PRIMARY = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_MIRRORS = [
+  OVERPASS_PRIMARY,
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
+// kept as an alias for any older callers
+const OVERPASS_API = OVERPASS_PRIMARY;
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Overpass requests with mirror fallback + retry. 504 and 429 are common.
+ */
+async function overpassFetch(query: string, maxAttempts = 2): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    for (const endpoint of OVERPASS_MIRRORS) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: `data=${encodeURIComponent(query)}`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        if (response.ok) return response;
+        if (![429, 500, 502, 503, 504].includes(response.status)) return response;
+        lastError = new Error(`Overpass ${endpoint} returned ${response.status}`);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (attempt < maxAttempts) await delay(800 * Math.pow(2, attempt - 1));
+  }
+  throw lastError instanceof Error ? lastError : new Error('Overpass request failed');
 }
 
 /**
@@ -102,11 +134,7 @@ async function fetchLandUseData(lat: number, lng: number, radius: number) {
 out tags center;
 `;
 
-  const response = await fetch(OVERPASS_API, {
-    method: 'POST',
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
+  const response = await overpassFetch(query);
 
   if (!response.ok) {
     throw new Error(`Overpass API error: ${response.status}`);
@@ -285,12 +313,13 @@ is_in(${lat},${lng})->.enclosing;
 out tags;
 `;
 
-    const response = await fetch(OVERPASS_API, {
-      method: 'POST',
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-
+    let response: Response;
+    try {
+      response = await overpassFetch(query, 1);
+    } catch (e) {
+      console.warn('Overpass is_in check failed, skipping validation:', e);
+      return { isValid: true, hardViolations: [], warnings: [] };
+    }
     if (!response.ok) {
       console.warn(`Overpass is_in check failed (${response.status}), skipping validation`);
       return { isValid: true, hardViolations: [], warnings: [] };

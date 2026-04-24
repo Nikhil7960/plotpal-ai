@@ -6,6 +6,7 @@ export type AnalysisStage =
   | 'context'
   | 'analyzing'
   | 'filtering'
+  | 'auditing'
   | 'validating'
   | 'processing';
 
@@ -61,14 +62,19 @@ const STAGE_CONFIG: Record<AnalysisStage, { text: string; detail: string; progre
     progress: 45,
   },
   filtering: {
-    text: 'Verifying with Google Search...',
-    detail: 'Cross-referencing locations against web data for ownership, zoning, and restrictions',
-    progress: 65,
+    text: 'Filtering hard blockers...',
+    detail: 'Removing candidates that fall on water bodies, military zones, or active transport corridors',
+    progress: 60,
+  },
+  auditing: {
+    text: 'Visually auditing each candidate...',
+    detail: 'Re-inspecting the satellite image to confirm each suggested pixel is actually vacant land',
+    progress: 75,
   },
   validating: {
-    text: 'Running hard validation checks...',
-    detail: 'Programmatically verifying each coordinate against OpenStreetMap zone data',
-    progress: 82,
+    text: 'Cross-checking with OpenStreetMap...',
+    detail: 'Programmatically verifying each coordinate against OSM zone data',
+    progress: 88,
   },
   processing: {
     text: 'Finalizing results...',
@@ -77,7 +83,7 @@ const STAGE_CONFIG: Record<AnalysisStage, { text: string; detail: string; progre
   },
 };
 
-const STAGE_ORDER: AnalysisStage[] = ['capturing', 'context', 'analyzing', 'filtering', 'validating', 'processing'];
+const STAGE_ORDER: AnalysisStage[] = ['capturing', 'context', 'analyzing', 'filtering', 'auditing', 'validating', 'processing'];
 
 export function AnalysisProgress({ stage }: { stage: AnalysisStage }) {
   const current = STAGE_CONFIG[stage];

@@ -1,12 +1,19 @@
 import type L from "leaflet";
 
-const ARCGIS_VIEWER_BASE =
-  "https://www.arcgis.com/apps/webappviewer/index.html?id=3a5c0a98a75341b985c10700dec6c4b8";
+// Mumbai Development_Plan_2034 MapServer — renders Land Parcels (layer 13)
+// together with wards/villages/TP schemes. This is the layer the Property
+// Lookup viewer shades red.
+const DP_MAPSERVER =
+  "https://agsmaps.mcgm.gov.in/server/rest/services/Development_Plan_2034/MapServer";
 
-const ARCGIS_ITEM_ID = "3a5c0a98a75341b985c10700dec6c4b8";
+// Land Parcels (layer 13) hides when scale > 6000. For an 800×600 PNG at
+// 96dpi that corresponds to a bbox width of roughly ~1100m at Mumbai's latitude.
+// We clamp exports to this width so the red shading is always rendered.
+const PARCEL_SCALE_LIMIT = 6000;
+const EXPORT_DPI = 96;
 
 /**
- * Convert Leaflet bounds to ArcGIS extent string (minLng,minLat,maxLng,maxLat) in GCS.
+ * Convert Leaflet bounds to a comma-separated bbox string in WGS84.
  */
 export function leafletBoundsToExtent(bounds: L.LatLngBounds): string {
   const west = bounds.getWest();
@@ -16,43 +23,82 @@ export function leafletBoundsToExtent(bounds: L.LatLngBounds): string {
   return [west, south, east, north].map((n) => n.toFixed(6)).join(",");
 }
 
-/** Property/parcel layer IDs so red shaded layers are visible when the iframe loads. */
-const PROPERTY_LAYER_IDS =
-  "MCGMGIS_Departments_Master_All_Layers_7387;Development_Plan_2034_5938;Development_Department_8086";
-
 /**
- * Build ArcGIS Web App Viewer URL with extent and showLayers (red property layers visible).
- */
-export function buildArcGISViewerUrl(options: { extent: string }): string {
-  const params = new URLSearchParams();
-  params.set("extent", options.extent);
-  params.set("showLayers", PROPERTY_LAYER_IDS);
-  return `${ARCGIS_VIEWER_BASE}&${params.toString()}`;
-}
-
-/**
- * Build initial extent from center [lat, lng] and zoom by approximating a bounding box.
- * Leaflet zoom level corresponds roughly to ArcGIS level; we derive a delta for lat/lng.
+ * Build a WGS84 bbox string from a center and Leaflet zoom.
  */
 export function centerZoomToExtent(
   center: [number, number],
   zoom: number
 ): string {
   const [lat, lng] = center;
-  // Approximate degrees per pixel at given zoom (Web Mercator); ~360/256/2^zoom at equator.
   const scale = 360 / Math.pow(2, zoom + 8);
-  const delta = scale * 128; // half of 256px tile
-  const minLng = (lng - delta).toFixed(6);
-  const minLat = (lat - delta).toFixed(6);
-  const maxLng = (lng + delta).toFixed(6);
-  const maxLat = (lat + delta).toFixed(6);
-  return [minLng, minLat, maxLng, maxLat].join(",");
+  const delta = scale * 128;
+  return [
+    (lng - delta).toFixed(6),
+    (lat - delta).toFixed(6),
+    (lng + delta).toFixed(6),
+    (lat + delta).toFixed(6),
+  ].join(",");
+}
+
+function computeScale(widthMeters: number, widthPixels: number): number {
+  const imgMeters = (widthPixels / EXPORT_DPI) * 0.0254;
+  return widthMeters / imgMeters;
+}
+
+function shrinkBboxToScale(
+  extent: string,
+  widthPx: number,
+  heightPx: number,
+  targetScale: number
+): string {
+  const [minLng, minLat, maxLng, maxLat] = extent.split(",").map(parseFloat);
+  const lat = (minLat + maxLat) / 2;
+  const lng = (minLng + maxLng) / 2;
+  const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
+  const metersPerDegLat = 110540;
+
+  // ArcGIS expands the bbox to match image aspect ratio. Pre-match it here so
+  // the returned scale is predictable.
+  const imgAspect = widthPx / heightPx;
+  let halfW = (maxLng - minLng) / 2;
+  let halfH = (maxLat - minLat) / 2;
+  const widthMetersNow = halfW * 2 * metersPerDegLng;
+  const heightMetersNow = halfH * 2 * metersPerDegLat;
+  const bboxAspect = widthMetersNow / Math.max(heightMetersNow, 1e-9);
+  if (bboxAspect < imgAspect) {
+    // widen horizontally
+    const newWidthMeters = heightMetersNow * imgAspect;
+    halfW = newWidthMeters / 2 / metersPerDegLng;
+  } else {
+    // tall-ify vertically
+    const newHeightMeters = widthMetersNow / imgAspect;
+    halfH = newHeightMeters / 2 / metersPerDegLat;
+  }
+
+  // Now enforce the scale ceiling, with some headroom.
+  const widthMeters = halfW * 2 * metersPerDegLng;
+  const currentScale = computeScale(widthMeters, widthPx);
+  const scaleHeadroom = 0.85; // stay comfortably inside the 6000 threshold
+
+  if (currentScale > targetScale * scaleHeadroom) {
+    const shrink = (targetScale * scaleHeadroom) / currentScale;
+    halfW *= shrink;
+    halfH *= shrink;
+  }
+
+  return [
+    (lng - halfW).toFixed(6),
+    (lat - halfH).toFixed(6),
+    (lng + halfW).toFixed(6),
+    (lat + halfH).toFixed(6),
+  ].join(",");
 }
 
 /**
- * Fetch a rendered map export image from ArcGIS MapServer for the given extent.
- * Tries to get the property/zoning overlay as a PNG image.
- * Returns base64 string or null if unavailable.
+ * Render a PNG showing Mumbai property parcels + wards + TP schemes over the
+ * given extent. Automatically tightens the bbox so the map scale stays within
+ * the upstream layer's visibility threshold (6000). Returns base64 or null.
  */
 export async function fetchArcGISMapExport(
   extent: string,
@@ -60,40 +106,18 @@ export async function fetchArcGISMapExport(
   height: number = 600
 ): Promise<string | null> {
   try {
-    // First, get the web app config to find operational layer URLs
-    const configUrl = `https://www.arcgis.com/sharing/rest/content/items/${ARCGIS_ITEM_ID}/data?f=json`;
-    const configResp = await fetch(configUrl);
-    if (!configResp.ok) return null;
+    const safeExtent = shrinkBboxToScale(extent, width, height, PARCEL_SCALE_LIMIT);
+    const layers = "show:10,11,12,13"; // wards, villages, TP schemes, parcels
+    const url =
+      `${DP_MAPSERVER}/export?bbox=${safeExtent}&bboxSR=4326&imageSR=4326` +
+      `&size=${width},${height}&format=png&transparent=true&layers=${layers}&f=image`;
 
-    const config = await configResp.json();
-
-    // Find the first operational layer with a MapServer URL
-    const layers = config?.map?.operationalLayers || [];
-    let mapServerUrl: string | null = null;
-    for (const layer of layers) {
-      if (layer.url && layer.url.includes('MapServer')) {
-        mapServerUrl = layer.url;
-        break;
-      }
-    }
-
-    if (!mapServerUrl) {
-      console.warn('No MapServer URL found in ArcGIS webapp config');
-      return null;
-    }
-
-    // Export the map as PNG
-    const [minLng, minLat, maxLng, maxLat] = extent.split(',');
-    const bbox = `${minLng},${minLat},${maxLng},${maxLat}`;
-    const exportUrl = `${mapServerUrl}/export?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${width},${height}&format=png&transparent=true&f=image`;
-
-    const imgResp = await fetch(exportUrl);
-    if (!imgResp.ok) return null;
-
-    const blob = await imgResp.blob();
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
     return await blobToBase64(blob);
   } catch (error) {
-    console.warn('ArcGIS map export failed (CORS or network):', error);
+    console.warn("ArcGIS map export failed:", error);
     return null;
   }
 }
@@ -103,8 +127,7 @@ function blobToBase64(blob: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
-      // Strip the data URL prefix to get raw base64
-      resolve(result.split(',')[1] || '');
+      resolve(result.split(",")[1] || "");
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);

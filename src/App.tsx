@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
 import MergeMapPage from "./pages/MergeMapPage";
+import BuildPlanPage from "./pages/BuildPlanPage";
+import PlanVisualizePage from "./pages/PlanVisualizePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +22,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/mergemap" element={<MergeMapPage />} />
+            <Route path="/plan" element={<BuildPlanPage />} />
+            <Route path="/plan/:id" element={<BuildPlanPage />} />
+            <Route path="/plan/:id/visualize" element={<PlanVisualizePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

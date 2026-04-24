@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import type { LocationContext } from './locationContext';
+import { generateContentWithFallback } from './geminiRetry';
+import { pixelToLatLng, isInBounds, type ImageBounds, type ImageSize } from './imageCoords';
 
 export interface VacantSpace {
   location: string;
@@ -9,6 +11,7 @@ export interface VacantSpace {
   considerations: string[];
   description: string;
   validationStatus?: 'verified' | 'unverified';
+  pixelCoordinates?: { x: number; y: number };
 }
 
 export interface AnalysisResult {
@@ -37,7 +40,9 @@ export async function analyzeVacantSpaceWithQwenVL(
   location: string,
   mapCenter: { lat: number; lng: number },
   locationContext?: LocationContext,
-  propertyMapBase64?: string
+  propertyMapBase64?: string,
+  imageBounds?: ImageBounds,
+  imageSize?: ImageSize
 ): Promise<AnalysisResult> {
   try {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -49,7 +54,6 @@ export async function analyzeVacantSpaceWithQwenVL(
 
     const buildingDescription = BUILDING_CONTEXT[buildingType as keyof typeof BUILDING_CONTEXT] || buildingType;
 
-    // Build the ground truth section if location context is available
     const groundTruthSection = locationContext
       ? `\n== AREA CONTEXT (from OpenStreetMap) ==\n${locationContext.summary}\n`
       : '';
@@ -58,12 +62,28 @@ export async function analyzeVacantSpaceWithQwenVL(
       ? '\nA second image is provided showing property/zoning map overlay for this area. Use it to identify zones marked for development or vacant parcels.\n'
       : '';
 
+    // If we have bounds + size, ask for pixel coords and convert in code.
+    // Pixel coords are far more reliable than AI-estimated lat/lng.
+    const pixelMode = !!(imageBounds && imageSize);
+
+    const geoSection = pixelMode
+      ? `\n== IMAGE COORDINATE SYSTEM ==
+The satellite image is ${imageSize!.width} × ${imageSize!.height} pixels.
+Pixel (0,0) is the TOP-LEFT corner. Pixel (${imageSize!.width - 1}, ${imageSize!.height - 1}) is the BOTTOM-RIGHT corner.
+
+The image covers this geographic area:
+- North edge (top):    latitude ${imageBounds!.north.toFixed(6)}
+- South edge (bottom): latitude ${imageBounds!.south.toFixed(6)}
+- West edge (left):    longitude ${imageBounds!.west.toFixed(6)}
+- East edge (right):   longitude ${imageBounds!.east.toFixed(6)}
+
+For each vacant space, you MUST return its pixel center (x, y) in the image. The system will convert pixel → lat/lng deterministically. Do NOT invent or approximate lat/lng yourself.\n`
+      : `\nLocation: ${location}\nMap Center: ${mapCenter.lat.toFixed(6)}, ${mapCenter.lng.toFixed(6)}\n`;
+
     const prompt = `You are an expert urban planner analyzing satellite imagery to identify vacant or underutilized spaces suitable for building ${buildingDescription}.
 
-Location: ${location}
-Map Center: ${mapCenter.lat.toFixed(6)}, ${mapCenter.lng.toFixed(6)}
 Building Type: ${buildingType}
-${groundTruthSection}${propertyMapNote}
+${geoSection}${groundTruthSection}${propertyMapNote}
 == WHAT TO LOOK FOR ==
 Identify 2-4 spaces in the satellite image that appear suitable for development:
 1. Empty/cleared lots with no structures (bare earth, gravel, unused land)
@@ -74,22 +94,24 @@ Identify 2-4 spaces in the satellite image that appear suitable for development:
 
 == WHAT TO AVOID ==
 Do NOT suggest locations that are:
-- Directly inside a visible water body (river, lake, ocean)
+- Directly on a visible water body (river, lake, ocean, creek)
 - Inside a military installation
-- On top of existing occupied residential buildings or apartment complexes
+- On top of existing occupied residential buildings, slums, or dense informal settlements (rows of small structures with metal/blue roofs are slums — NOT vacant)
+- On top of active roads, highways, or railway tracks
 
-== IMPORTANT ==
-- Coordinates MUST be within the visible satellite image area (close to the map center)
-- Existing buildings with people living in them are NOT vacant — look for genuinely empty land
-- Urban areas often have small vacant plots between buildings — these ARE valid suggestions
-- If you can see open/bare land in the image, suggest it even if the area is densely developed nearby
+== BE STRICT ==
+- If the pixel you pick has a building rooftop on it, that is NOT a vacant space — move to a truly empty pixel
+- Open green areas like parks or playing fields are NOT vacant unless explicitly designated for redevelopment
+- A dense grid of small buildings (chawls, slums) is NOT vacant even if roofs look similar — look for genuine BARE land only
+- Prefer FEWER high-quality picks over many low-quality ones. If only 1 good spot exists, return just 1.
 
+== OUTPUT FORMAT ==
 Return ONLY valid JSON in this EXACT format:
 {
   "vacantSpaces": [
     {
+      "pixel": { "x": <integer pixel x>, "y": <integer pixel y> },
       "location": "Descriptive location using visible landmarks and streets",
-      "coordinates": { "lat": <latitude>, "lng": <longitude> },
       "suitability": <0-100>,
       "reasons": ["Reason 1", "Reason 2", "Reason 3"],
       "considerations": ["Challenge 1", "Challenge 2"],
@@ -98,9 +120,10 @@ Return ONLY valid JSON in this EXACT format:
   ],
   "analysis": "Overall area assessment for ${buildingType} development",
   "confidence": <0-100>
-}`;
+}
 
-    // Build content parts: prompt + satellite image + optional property map
+${pixelMode ? 'CRITICAL: The "pixel" field must be the center of the vacant plot in image pixels. Aim for pixels where you can visually confirm bare land, cleared ground, or an empty parcel. Precision matters — if the vacant plot is 40 pixels wide, the pixel center should be within those 40 pixels, not on an adjacent building.' : 'Include "coordinates": { "lat": ..., "lng": ... } for each space.'}`;
+
     const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
       { text: prompt },
       { inlineData: { mimeType: 'image/png', data: imageBase64 } },
@@ -110,55 +133,79 @@ Return ONLY valid JSON in this EXACT format:
       parts.push({ inlineData: { mimeType: 'image/png', data: propertyMapBase64 } });
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      config: {
-        temperature: 0.3,
-      },
-      contents: [
-        {
-          role: 'user',
-          parts,
-        },
-      ],
+    const response = await generateContentWithFallback(ai, {
+      config: { temperature: 0.3 },
+      contents: [{ role: 'user', parts }],
     });
 
     const content = response.text ?? '';
 
-    // Parse the response
-    let result: AnalysisResult;
+    let raw: {
+      vacantSpaces?: Array<{
+        pixel?: { x: number; y: number };
+        coordinates?: { lat: number; lng: number };
+        location?: string;
+        suitability?: number;
+        reasons?: string[];
+        considerations?: string[];
+        description?: string;
+      }>;
+      analysis?: string;
+      confidence?: number;
+    };
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
-      }
-    } catch (parseError) {
+      if (!jsonMatch) throw new Error('No JSON found in response');
+      raw = JSON.parse(jsonMatch[0]);
+    } catch {
       throw new Error('Failed to parse AI response');
     }
 
-    // Validate and enhance the result
-    if (result.vacantSpaces && Array.isArray(result.vacantSpaces)) {
-      result.vacantSpaces = result.vacantSpaces.map((space, index) => ({
-        location: space.location || `Site ${index + 1}`,
-        coordinates: space.coordinates || {
-          lat: mapCenter.lat + (Math.random() - 0.5) * 0.01,
-          lng: mapCenter.lng + (Math.random() - 0.5) * 0.01,
-        },
-        suitability: Math.min(100, Math.max(0, space.suitability || 75)),
-        reasons: Array.isArray(space.reasons) ? space.reasons : ['Suitable location identified'],
-        considerations: Array.isArray(space.considerations) ? space.considerations : ['Further analysis recommended'],
-        description: space.description || 'Potential development site'
-      }));
+    const rawSpaces = Array.isArray(raw.vacantSpaces) ? raw.vacantSpaces : [];
+    const spaces: VacantSpace[] = [];
+
+    for (let i = 0; i < rawSpaces.length; i++) {
+      const s = rawSpaces[i];
+      let coords: { lat: number; lng: number } | null = null;
+      let pixel: { x: number; y: number } | undefined;
+
+      if (pixelMode && s.pixel && Number.isFinite(s.pixel.x) && Number.isFinite(s.pixel.y)) {
+        pixel = { x: s.pixel.x, y: s.pixel.y };
+        if (
+          pixel.x >= 0 && pixel.x < imageSize!.width &&
+          pixel.y >= 0 && pixel.y < imageSize!.height
+        ) {
+          coords = pixelToLatLng(pixel.x, pixel.y, imageBounds!, imageSize!);
+        }
+      } else if (s.coordinates && Number.isFinite(s.coordinates.lat) && Number.isFinite(s.coordinates.lng)) {
+        coords = { lat: s.coordinates.lat, lng: s.coordinates.lng };
+        if (imageBounds && !isInBounds(coords.lat, coords.lng, imageBounds, 0.1)) {
+          console.warn(`Dropping space "${s.location}" — coordinates outside image bounds`);
+          coords = null;
+        }
+      }
+
+      if (!coords) {
+        console.warn(`Dropping space "${s.location || `#${i}`}" — no valid coordinates from AI`);
+        continue;
+      }
+
+      spaces.push({
+        location: s.location || `Site ${i + 1}`,
+        coordinates: coords,
+        pixelCoordinates: pixel,
+        suitability: Math.min(100, Math.max(0, s.suitability ?? 75)),
+        reasons: Array.isArray(s.reasons) && s.reasons.length > 0 ? s.reasons : ['Suitable location identified'],
+        considerations: Array.isArray(s.considerations) ? s.considerations : [],
+        description: s.description || 'Potential development site',
+      });
     }
 
     return {
-      vacantSpaces: result.vacantSpaces || [],
-      analysis: result.analysis || 'Analysis completed',
-      confidence: Math.min(100, Math.max(0, result.confidence || 80))
+      vacantSpaces: spaces,
+      analysis: raw.analysis || 'Analysis completed',
+      confidence: Math.min(100, Math.max(0, raw.confidence ?? 80)),
     };
-
   } catch (error) {
     console.error('Error analyzing with Gemini:', error);
     throw new Error(`Failed to analyze vacant spaces: ${error instanceof Error ? error.message : 'Unknown error'}`);
