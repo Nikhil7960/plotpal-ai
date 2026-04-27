@@ -95,6 +95,8 @@ export interface Approval {
   required: boolean;
   triggerReason?: string;
   gotcha?: string;
+  // Where to apply / look up details. Opens in a new tab from the card.
+  applicationUrl?: string;
 }
 
 // Materials / BoQ

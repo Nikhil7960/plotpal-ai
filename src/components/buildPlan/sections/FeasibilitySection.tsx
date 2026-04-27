@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, Clock, Ruler } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Ruler } from "lucide-react";
 import type { Approval, BuildPlan } from "@/services/buildPlan/types";
 import EnvelopeDiagram from "../visuals/EnvelopeDiagram";
 
@@ -61,8 +61,27 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function ApprovalCard({ approval }: { approval: Approval }) {
+  const interactive = !!approval.applicationUrl;
+  const Wrapper: React.ElementType = interactive ? "a" : "div";
+  const wrapperProps = interactive
+    ? {
+        href: approval.applicationUrl,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        "aria-label": `Open ${approval.name} application portal`,
+      }
+    : {};
+
   return (
-    <div className="rounded-md border p-2.5 bg-card text-sm">
+    <Wrapper
+      {...wrapperProps}
+      className={[
+        "block rounded-md border p-2.5 bg-card text-sm",
+        interactive
+          ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          : "",
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -71,6 +90,9 @@ function ApprovalCard({ approval }: { approval: Approval }) {
               <Badge variant="secondary" className="text-[10px]">Required</Badge>
             ) : (
               <Badge variant="outline" className="text-[10px]">Conditional</Badge>
+            )}
+            {interactive && (
+              <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
           </div>
           <div className="text-xs text-muted-foreground">{approval.authority}</div>
@@ -91,6 +113,11 @@ function ApprovalCard({ approval }: { approval: Approval }) {
           <span className="text-foreground">Gotcha:</span> {approval.gotcha}
         </div>
       )}
-    </div>
+      {interactive && (
+        <div className="mt-1 text-[11px] text-primary/80">
+          Tap to open application portal →
+        </div>
+      )}
+    </Wrapper>
   );
 }

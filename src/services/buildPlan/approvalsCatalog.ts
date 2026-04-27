@@ -26,6 +26,7 @@ export function computeApprovals(
       typicalTatMonths: r(2, 4, 7),
       required: true,
       gotcha: "Plans are scrutinised against DCPR 2034; concessions/objections are common.",
+      applicationUrl: "https://autodcr.mcgm.gov.in/",
     },
     {
       key: "cc", name: "Commencement Certificate (CC)",
@@ -33,6 +34,7 @@ export function computeApprovals(
       typicalTatMonths: r(1, 2, 4),
       required: true,
       gotcha: "Issued after IOA conditions are satisfied; premium payments finalised here.",
+      applicationUrl: "https://autodcr.mcgm.gov.in/",
     },
     {
       key: "oc", name: "Occupation Certificate (OC)",
@@ -40,6 +42,7 @@ export function computeApprovals(
       typicalTatMonths: r(2, 3, 6),
       required: true,
       gotcha: "Part OCs possible for phased handover — negotiate upfront.",
+      applicationUrl: "https://autodcr.mcgm.gov.in/",
     },
     {
       key: "rera", name: "MahaRERA Registration",
@@ -48,6 +51,7 @@ export function computeApprovals(
       indicativeCostRange: r(0.5, 1.2, 2.5),
       required: ["residential", "retail", "office", "mall", "hotel"].includes(infra),
       gotcha: "Mandatory before marketing > 500 sqm or > 8 units.",
+      applicationUrl: "https://maharera.maharashtra.gov.in/",
     },
     {
       key: "fire", name: "Fire NOC",
@@ -56,6 +60,7 @@ export function computeApprovals(
       indicativeCostRange: r(0.8, 2, 4),
       required: envelope.heightEstimateM >= 15 || ["hospital", "hotel", "mall", "school"].includes(infra),
       gotcha: "Two-stage (provisional + final); refusal common for blocked approach for fire tenders.",
+      applicationUrl: "https://mahafireservice.gov.in/",
     },
     {
       key: "tree", name: "Tree Authority NOC",
@@ -64,6 +69,7 @@ export function computeApprovals(
       indicativeCostRange: r(0.3, 0.8, 2),
       required: true,
       gotcha: "Replanting ratio is typically 1:3. Activist petitions are a real delay risk.",
+      applicationUrl: "https://portal.mcgm.gov.in/irj/portal/anonymous/qlcityservices",
     },
   ];
 
@@ -76,6 +82,7 @@ export function computeApprovals(
       required: true,
       triggerReason: `Built-up area ${Math.round(buaSqM).toLocaleString()} m² > 20,000 m².`,
       gotcha: "Public hearing + EIA consultant; often the critical path item.",
+      applicationUrl: "https://parivesh.nic.in/",
     });
   }
   if (requiresAAI) {
@@ -88,6 +95,7 @@ export function computeApprovals(
         ? "Plot lies within CSMIA airport funnel."
         : `Building height ~${envelope.heightEstimateM}m triggers AAI review.`,
       gotcha: "Can clip floors silently — review before paying premium FSI.",
+      applicationUrl: "https://nocas2.aai.aero/nocas/",
     });
   }
   if (requiresCRZ) {
@@ -98,6 +106,7 @@ export function computeApprovals(
       required: true,
       triggerReason: "Plot within Coastal Regulation Zone.",
       gotcha: "CRZ-II allows urban dev; CRZ-I/III severely restrict — classification matters.",
+      applicationUrl: "https://mczma.maharashtra.gov.in/",
     });
   }
   if (requiresMHCC) {
@@ -108,6 +117,7 @@ export function computeApprovals(
       required: true,
       triggerReason: "Plot in notified heritage precinct.",
       gotcha: "Facade, massing, colour palette all dictated; timelines unpredictable.",
+      applicationUrl: "https://portal.mcgm.gov.in/",
     });
   }
   if (isHospital) {
@@ -117,6 +127,7 @@ export function computeApprovals(
       typicalTatMonths: r(2, 4, 8),
       required: true,
       gotcha: "BMC registration + Bombay Nursing Homes Act compliance.",
+      applicationUrl: "https://portal.mcgm.gov.in/",
     });
   }
   if (isSchool) {
@@ -126,6 +137,7 @@ export function computeApprovals(
       typicalTatMonths: r(4, 8, 14),
       required: true,
       gotcha: "Affiliation (SSC/CBSE/ICSE) runs in parallel and can gate admissions.",
+      applicationUrl: "https://education.maharashtra.gov.in/",
     });
   }
 

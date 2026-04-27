@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import {
 import {
   createPlan, getPlan, updatePlan, type StoredPlan,
 } from "@/services/buildPlan/planStore";
+import { exportPlanToPDF } from "@/services/buildPlan/pdfExport";
 import { reverseGeocode } from "@/services/locationContext";
 import { fetchNearbyPOIs, type POICategory } from "@/utils/osmPOI";
 
@@ -80,6 +82,8 @@ export default function BuildPlanPage() {
   );
   const [pois, setPois] = useState<POICategory[] | undefined>(undefined);
   const [resolvedAddress, setResolvedAddress] = useState<string | undefined>(undefined);
+  const [isExporting, setIsExporting] = useState(false);
+  const planContentRef = useRef<HTMLDivElement>(null);
 
   // If plan id changes or doesn't exist, handle gracefully.
   useEffect(() => {
@@ -128,6 +132,27 @@ export default function BuildPlanPage() {
     return generateBuildPlan({ plot, infra: stored.infra, preferences: prefs, scenario });
   }, [plot, stored?.infra, prefs, scenario]);
 
+  const handleExportPDF = async () => {
+    if (!plan || !stored || !planContentRef.current) return;
+    setIsExporting(true);
+    const t = toast.loading("Generating PDF…");
+    try {
+      await exportPlanToPDF({
+        plan,
+        element: planContentRef.current,
+        planId: stored.id,
+        images: stored.images,
+        beforeImage: stored.beforeImage,
+      });
+      toast.success("PDF downloaded", { id: t });
+    } catch (err) {
+      console.error("PDF export failed", err);
+      toast.error("Couldn't generate PDF. Try again.", { id: t });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!stored) return null;
 
   return (
@@ -150,8 +175,14 @@ export default function BuildPlanPage() {
               <Button variant="outline" size="sm" onClick={clearPrefs}>
                 <Settings2 className="h-4 w-4 mr-1" /> Edit preferences
               </Button>
-              <Button variant="outline" size="sm" disabled>
-                <Download className="h-4 w-4 mr-1" /> Export PDF
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={isExporting}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                {isExporting ? "Exporting…" : "Export PDF"}
               </Button>
             </div>
           )}
@@ -177,7 +208,7 @@ export default function BuildPlanPage() {
             />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6" ref={planContentRef}>
             <PlanHeader plan={plan} />
             <FeasibilitySection plan={plan} />
             <CostSection plan={plan} />
